@@ -1,0 +1,14 @@
+# coding agent
+CLAUDE.md
+
+# plan docs
+docs/
+todo.md
+
+# python / uv
+.venv/
+__pycache__/
+*.pyc
+.env
+
+
