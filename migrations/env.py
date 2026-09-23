@@ -1,13 +1,12 @@
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
+from cui_db.base import Base
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from alembic import context
-
-from cui_db.base import Base
 from config import settings
 
 # this is the Alembic Config object, which provides
@@ -68,10 +67,7 @@ async def run_async_migrations() -> None:
 
     """
 
-    connectable = create_async_engine(
-        settings.DATABASE_URL,
-        poolclass=pool.NullPool
-    )
+    connectable = create_async_engine(settings.database_url, poolclass=pool.NullPool)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

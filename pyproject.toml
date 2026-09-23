@@ -28,6 +28,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+exclude = ["migrations/versions"]
 # target-version intentionally omitted: ruff infers it from
 # project.requires-python.
 
@@ -37,3 +38,4 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]

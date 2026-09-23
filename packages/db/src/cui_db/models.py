@@ -30,6 +30,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
 
+
 class Tenant(Base):
     __tablename__ = "tenants"
 
@@ -37,6 +38,7 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String)
     retention_days: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
+
 
 class TenantMembership(Base):
     __tablename__ = "tenant_memberships"
@@ -49,6 +51,7 @@ class TenantMembership(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("tenants.id"), primary_key=True)
     role: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
+
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
@@ -63,11 +66,10 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
 
+
 class Service(Base):
     __tablename__ = "services"
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "name", "environment", name="uix_service"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "name", "environment", name="uix_service"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("tenants.id"))
@@ -75,11 +77,13 @@ class Service(Base):
     environment: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
 
+
 class IngestBatch(Base):
     __tablename__ = "ingest_batches"
     __table_args__ = (
-        CheckConstraint("status IN ('QUEUED', 'PROCESSING', 'PERSISTED', 'FAILED')",
-                        name="ck_status_valid"),
+        CheckConstraint(
+            "status IN ('QUEUED', 'PROCESSING', 'PERSISTED', 'FAILED')", name="ck_status_valid"
+        ),
     )
 
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True)
@@ -93,6 +97,7 @@ class IngestBatch(Base):
     failed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(String)
+
 
 class LogEvent(Base):
     __tablename__ = "log_events"
@@ -110,10 +115,11 @@ class LogEvent(Base):
     custom: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     __table_args__ = (
-        CheckConstraint("level IN ('INFO', 'WARNING', 'DEBUG', 'ERROR', 'CRITICAL')",
-                        name="ck_level_valid"),
+        CheckConstraint(
+            "level IN ('INFO', 'WARNING', 'DEBUG', 'ERROR', 'CRITICAL')", name="ck_level_valid"
+        ),
         UniqueConstraint("tenant_id", "event_id", name="uix_event"),
         Index("ix_tid_occurred", "tenant_id", occurred_at.desc()),
         Index("ix_tid_sname_occurred", "tenant_id", "service_name", occurred_at.desc()),
-        Index("ix_tid_lv_occurred", "tenant_id", "level", occurred_at.desc())
+        Index("ix_tid_lv_occurred", "tenant_id", "level", occurred_at.desc()),
     )
