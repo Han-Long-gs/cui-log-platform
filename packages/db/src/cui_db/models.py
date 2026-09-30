@@ -22,6 +22,8 @@ from .base import Base
 # Ref: https://docs.sqlalchemy.org/en/21/core/constraints.html#unique-constraint
 #       https://docs.sqlalchemy.org/en/21/core/constraints.html#indexes
 class User(Base):
+    """A person who can sign in; identified by the identity provider's subject (external_subject)."""
+
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -32,6 +34,9 @@ class User(Base):
 
 
 class Tenant(Base):
+    """An organization that owns API keys, services and log events; the unit of data isolation.
+    retention_days is how long its log events are kept."""
+
     __tablename__ = "tenants"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -41,6 +46,8 @@ class Tenant(Base):
 
 
 class TenantMembership(Base):
+    """Links a user to a tenant with a role (OWNER or MEMBER); (user_id, tenant_id) is the primary key."""
+
     __tablename__ = "tenant_memberships"
     __table_args__ = (
         # name arg = the name for this constraint
@@ -54,6 +61,9 @@ class TenantMembership(Base):
 
 
 class ApiKey(Base):
+    """An API key belonging to one tenant. Only key_prefix and key_hash are stored, never the raw key.
+    The key is usable while revoked_at is NULL and expires_at is NULL or in the future."""
+
     __tablename__ = "api_keys"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
@@ -68,6 +78,8 @@ class ApiKey(Base):
 
 
 class Service(Base):
+    """A service/environment pair that sends logs for a tenant; (tenant_id, name, environment) is unique."""
+
     __tablename__ = "services"
     __table_args__ = (UniqueConstraint("tenant_id", "name", "environment", name="uix_service"),)
 
@@ -79,6 +91,9 @@ class Service(Base):
 
 
 class IngestBatch(Base):
+    """One ingestion request tracked through QUEUED -> PROCESSING -> PERSISTED or FAILED.
+    Timestamps record when each state was reached; retry_count and error_message describe failures."""
+
     __tablename__ = "ingest_batches"
     __table_args__ = (
         CheckConstraint("status IN ('QUEUED', 'PROCESSING', 'PERSISTED', 'FAILED')", name="ck_status_valid"),
@@ -98,6 +113,11 @@ class IngestBatch(Base):
 
 
 class LogEvent(Base):
+    """A single stored log event belonging to one tenant.
+    level must be one of INFO / WARNING / DEBUG / ERROR / CRITICAL; (tenant_id, event_id) is unique.
+    occurred_at is when the client produced the event, ingested_at when the server received it.
+    custom holds free-form client metadata; an absent value is stored as SQL NULL."""
+
     __tablename__ = "log_events"
 
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True)
@@ -110,7 +130,7 @@ class LogEvent(Base):
     occurred_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
     ingested_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
     trace_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
-    custom: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    custom: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
 
     __table_args__ = (
         CheckConstraint("level IN ('INFO', 'WARNING', 'DEBUG', 'ERROR', 'CRITICAL')", name="ck_level_valid"),
