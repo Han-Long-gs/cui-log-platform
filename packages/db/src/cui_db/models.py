@@ -81,9 +81,7 @@ class Service(Base):
 class IngestBatch(Base):
     __tablename__ = "ingest_batches"
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('QUEUED', 'PROCESSING', 'PERSISTED', 'FAILED')", name="ck_status_valid"
-        ),
+        CheckConstraint("status IN ('QUEUED', 'PROCESSING', 'PERSISTED', 'FAILED')", name="ck_status_valid"),
     )
 
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True)
@@ -115,9 +113,7 @@ class LogEvent(Base):
     custom: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     __table_args__ = (
-        CheckConstraint(
-            "level IN ('INFO', 'WARNING', 'DEBUG', 'ERROR', 'CRITICAL')", name="ck_level_valid"
-        ),
+        CheckConstraint("level IN ('INFO', 'WARNING', 'DEBUG', 'ERROR', 'CRITICAL')", name="ck_level_valid"),
         UniqueConstraint("tenant_id", "event_id", name="uix_event"),
         Index("ix_tid_occurred", "tenant_id", occurred_at.desc()),
         Index("ix_tid_sname_occurred", "tenant_id", "service_name", occurred_at.desc()),

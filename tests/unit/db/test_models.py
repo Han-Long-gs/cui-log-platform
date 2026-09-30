@@ -117,9 +117,7 @@ async def test_log_event_invalid_level(db_session: AsyncSession):
     """insert a log event with a level outside ('INFO','WARNING','DEBUG','ERROR','CRITICAL'),
     violating ck_level_valid"""
     now = datetime.now(UTC)
-    tenant = Tenant(
-        id=uuid.uuid4(), name="log-event-invalid-level-test", retention_days=1, created_at=now
-    )
+    tenant = Tenant(id=uuid.uuid4(), name="log-event-invalid-level-test", retention_days=1, created_at=now)
     db_session.add(tenant)
     await db_session.flush()
 
@@ -167,9 +165,7 @@ async def test_log_events_indexes_exist(db_session: AsyncSession):
     """verify the three composite indexes declared on log_events in __table_args__ were
     actually created in postgres (schema-level existence check; whether the query planner
     picks them up for a given query is verified separately in Ticket 1.9 via EXPLAIN ANALYZE)"""
-    result = await db_session.execute(
-        text("SELECT indexname FROM pg_indexes WHERE tablename = 'log_events'")
-    )
+    result = await db_session.execute(text("SELECT indexname FROM pg_indexes WHERE tablename = 'log_events'"))
     index_names = {row[0] for row in result.fetchall()}
 
     expected = {"ix_tid_occurred", "ix_tid_sname_occurred", "ix_tid_lv_occurred"}
@@ -211,15 +207,11 @@ async def test_user_duplicate_id(db_session: AsyncSession):
     now = datetime.now(UTC)
     shared_id = uuid.uuid4()
 
-    first_user = User(
-        id=shared_id, external_subject="oidc|first", email="first@example.com", created_at=now
-    )
+    first_user = User(id=shared_id, external_subject="oidc|first", email="first@example.com", created_at=now)
     db_session.add(first_user)
     await db_session.flush()
 
-    duplicate_user = User(
-        id=shared_id, external_subject="oidc|second", email="second@example.com", created_at=now
-    )
+    duplicate_user = User(id=shared_id, external_subject="oidc|second", email="second@example.com", created_at=now)
     db_session.add(duplicate_user)
 
     with pytest.raises(IntegrityError):
@@ -269,18 +261,12 @@ async def test_tenant_duplicate_id(db_session: AsyncSession):
 async def test_tenant_membership_create(db_session: AsyncSession):
     """create a valid tenant membership linking an existing user and tenant"""
     now = datetime.now(UTC)
-    user = User(
-        id=uuid.uuid4(), external_subject="oidc|member", email="member@example.com", created_at=now
-    )
-    tenant = Tenant(
-        id=uuid.uuid4(), name="membership-create-test", retention_days=30, created_at=now
-    )
+    user = User(id=uuid.uuid4(), external_subject="oidc|member", email="member@example.com", created_at=now)
+    tenant = Tenant(id=uuid.uuid4(), name="membership-create-test", retention_days=30, created_at=now)
     db_session.add_all([user, tenant])
     await db_session.flush()
 
-    membership = TenantMembership(
-        user_id=user.id, tenant_id=tenant.id, role="OWNER", created_at=now
-    )
+    membership = TenantMembership(user_id=user.id, tenant_id=tenant.id, role="OWNER", created_at=now)
     db_session.add(membership)
     await db_session.flush()
 
@@ -299,9 +285,7 @@ async def test_tenant_membership_invalid_role(db_session: AsyncSession):
     db_session.add_all([user, tenant])
     await db_session.flush()
 
-    invalid_membership = TenantMembership(
-        user_id=user.id, tenant_id=tenant.id, role="SUPERADMIN", created_at=now
-    )
+    invalid_membership = TenantMembership(user_id=user.id, tenant_id=tenant.id, role="SUPERADMIN", created_at=now)
     db_session.add(invalid_membership)
 
     with pytest.raises(IntegrityError):
@@ -314,22 +298,16 @@ async def test_tenant_membership_duplicate_pk(db_session: AsyncSession):
     """insert a second membership row for the same (user_id, tenant_id) pair, violating the
     composite primary key"""
     now = datetime.now(UTC)
-    user = User(
-        id=uuid.uuid4(), external_subject="oidc|duppk", email="duppk@example.com", created_at=now
-    )
+    user = User(id=uuid.uuid4(), external_subject="oidc|duppk", email="duppk@example.com", created_at=now)
     tenant = Tenant(id=uuid.uuid4(), name="duplicate-pk-test", retention_days=30, created_at=now)
     db_session.add_all([user, tenant])
     await db_session.flush()
 
-    first_membership = TenantMembership(
-        user_id=user.id, tenant_id=tenant.id, role="OWNER", created_at=now
-    )
+    first_membership = TenantMembership(user_id=user.id, tenant_id=tenant.id, role="OWNER", created_at=now)
     db_session.add(first_membership)
     await db_session.flush()
 
-    duplicate_membership = TenantMembership(
-        user_id=user.id, tenant_id=tenant.id, role="MEMBER", created_at=now
-    )
+    duplicate_membership = TenantMembership(user_id=user.id, tenant_id=tenant.id, role="MEMBER", created_at=now)
     db_session.add(duplicate_membership)
 
     with pytest.raises(IntegrityError):
@@ -351,9 +329,7 @@ async def test_tenant_membership_invalid_fk_tenant(db_session: AsyncSession):
     db_session.add(user)
     await db_session.flush()
 
-    invalid_membership = TenantMembership(
-        user_id=user.id, tenant_id=uuid.uuid4(), role="OWNER", created_at=now
-    )
+    invalid_membership = TenantMembership(user_id=user.id, tenant_id=uuid.uuid4(), role="OWNER", created_at=now)
     db_session.add(invalid_membership)
 
     with pytest.raises(IntegrityError):
@@ -370,9 +346,7 @@ async def test_tenant_membership_invalid_fk_user(db_session: AsyncSession):
     db_session.add(tenant)
     await db_session.flush()
 
-    invalid_membership = TenantMembership(
-        user_id=uuid.uuid4(), tenant_id=tenant.id, role="OWNER", created_at=now
-    )
+    invalid_membership = TenantMembership(user_id=uuid.uuid4(), tenant_id=tenant.id, role="OWNER", created_at=now)
     db_session.add(invalid_membership)
 
     with pytest.raises(IntegrityError):
@@ -403,9 +377,7 @@ async def test_api_key_create(db_session: AsyncSession):
 async def test_api_key_null_key_hash(db_session: AsyncSession):
     """insert an api key record with a null key_hash, violating the NOT NULL constraint"""
     now = datetime.now(UTC)
-    tenant = Tenant(
-        id=uuid.uuid4(), name="api-key-null-hash-test", retention_days=30, created_at=now
-    )
+    tenant = Tenant(id=uuid.uuid4(), name="api-key-null-hash-test", retention_days=30, created_at=now)
     db_session.add(tenant)
     await db_session.flush()
 
@@ -466,9 +438,7 @@ async def test_service_create(db_session: AsyncSession):
 async def test_service_null_name(db_session: AsyncSession):
     """insert a service record with a null name, violating the NOT NULL constraint"""
     now = datetime.now(UTC)
-    tenant = Tenant(
-        id=uuid.uuid4(), name="service-null-name-test", retention_days=30, created_at=now
-    )
+    tenant = Tenant(id=uuid.uuid4(), name="service-null-name-test", retention_days=30, created_at=now)
     db_session.add(tenant)
     await db_session.flush()
 
@@ -491,9 +461,7 @@ async def test_service_duplicate_unique(db_session: AsyncSession):
     """insert two services sharing the same (tenant_id, name, environment), violating
     uix_service"""
     now = datetime.now(UTC)
-    tenant = Tenant(
-        id=uuid.uuid4(), name="service-dup-unique-test", retention_days=30, created_at=now
-    )
+    tenant = Tenant(id=uuid.uuid4(), name="service-dup-unique-test", retention_days=30, created_at=now)
     db_session.add(tenant)
     await db_session.flush()
 
@@ -544,9 +512,7 @@ async def test_service_invalid_fk_tenant(db_session: AsyncSession):
 async def test_ingest_batch_create(db_session: AsyncSession):
     """create a valid ingest batch record linked to an existing tenant"""
     now = datetime.now(UTC)
-    tenant = Tenant(
-        id=uuid.uuid4(), name="ingest-batch-create-test", retention_days=30, created_at=now
-    )
+    tenant = Tenant(id=uuid.uuid4(), name="ingest-batch-create-test", retention_days=30, created_at=now)
     db_session.add(tenant)
     await db_session.flush()
 
@@ -559,15 +525,11 @@ async def test_ingest_batch_invalid_status(db_session: AsyncSession):
     """insert an ingest batch with a status outside ('QUEUED','PROCESSING','PERSISTED','FAILED'),
     violating ck_status_valid"""
     now = datetime.now(UTC)
-    tenant = Tenant(
-        id=uuid.uuid4(), name="ingest-batch-invalid-status-test", retention_days=30, created_at=now
-    )
+    tenant = Tenant(id=uuid.uuid4(), name="ingest-batch-invalid-status-test", retention_days=30, created_at=now)
     db_session.add(tenant)
     await db_session.flush()
 
-    invalid_batch = IngestBatch(
-        tenant_id=tenant.id, event_count=50, status="RETRYING", received_at=now
-    )
+    invalid_batch = IngestBatch(tenant_id=tenant.id, event_count=50, status="RETRYING", received_at=now)
     db_session.add(invalid_batch)
 
     with pytest.raises(IntegrityError):
@@ -580,9 +542,7 @@ async def test_ingest_batch_invalid_fk_tenant(db_session: AsyncSession):
     """insert an ingest batch referencing a tenant_id that does not exist, violating the tenant
     foreign key"""
     now = datetime.now(UTC)
-    invalid_batch = IngestBatch(
-        tenant_id=uuid.uuid4(), event_count=50, status="QUEUED", received_at=now
-    )
+    invalid_batch = IngestBatch(tenant_id=uuid.uuid4(), event_count=50, status="QUEUED", received_at=now)
     db_session.add(invalid_batch)
 
     with pytest.raises(IntegrityError):
