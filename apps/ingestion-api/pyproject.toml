@@ -1,0 +1,18 @@
+[project]
+name = "ingestion-api"
+version = "0.1.0"
+authors = [
+    { name = "Han Long", email = "hanlong.gensosanso@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "cui_db",
+    "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.6",
+    "pydantic>=2.13.5",
+    "uvicorn>=0.53.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
