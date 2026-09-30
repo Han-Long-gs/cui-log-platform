@@ -1,6 +1,7 @@
 import pytest_asyncio
 from cui_db import Base
 from sqlalchemy import pool
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -19,8 +20,8 @@ async def db_engine() -> AsyncEngine:
     """
 
     # make sure to run in test environment
-    if settings.env != "test":
-        raise RuntimeError("test run failed; please set the env to test in .env")
+    if not make_url(settings.database_url).database.endswith("test"):
+        raise RuntimeError(f"test run failed; refuse to run tests against {make_url(settings.database_url).database}")
     # BEFORE TESTING
     engine = create_async_engine(settings.database_url, poolclass=pool.NullPool)
 

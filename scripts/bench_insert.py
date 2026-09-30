@@ -81,7 +81,7 @@ async def commit_all(session: AsyncSession) -> float:
 async def main_one_by_one(amount: int) -> None:
     print("-----------------bench_insert Script Start...-----------------")
     print("-----------------Running in one-by-one mode...-----------------")
-    engine = create_async_engine(settings.database_url_dev, poolclass=pool.NullPool)
+    engine = create_async_engine(settings.database_url, poolclass=pool.NullPool)
     session_maker = async_sessionmaker(bind=engine, expire_on_commit=True)
     async with session_maker() as session:
         await session.begin()
@@ -101,7 +101,7 @@ async def main_one_by_one(amount: int) -> None:
 async def main_batch(amount: int) -> None:
     print("-----------------bench_insert Script Start...-----------------")
     print("-----------------Running in batch mode...-----------------")
-    engine = create_async_engine(settings.database_url_dev, poolclass=pool.NullPool)
+    engine = create_async_engine(settings.database_url, poolclass=pool.NullPool)
     session_maker = async_sessionmaker(bind=engine, expire_on_commit=True)
     async with session_maker() as session:
         await session.begin()

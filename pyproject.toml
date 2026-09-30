@@ -13,7 +13,10 @@ dependencies = [
 package = false
 
 [tool.uv.workspace]
-members = ["packages/*"]
+members = [
+    "packages/*",
+    "apps/*",
+]
 
 [tool.uv.sources]
 cui-db = { workspace = true }
@@ -27,7 +30,7 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 exclude = ["migrations/versions"]
 # target-version intentionally omitted: ruff infers it from
 # project.requires-python.

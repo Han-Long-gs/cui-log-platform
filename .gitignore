@@ -11,6 +11,8 @@ todo.md
 __pycache__/
 *.pyc
 .env
+.env.*
+!.env.example
 
 # other
 .vscode/
