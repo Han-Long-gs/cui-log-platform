@@ -6,10 +6,10 @@ from cui_db import LogEvent
 from sqlalchemy.orm import Session
 
 from .db import DEV_TENANT_ID
-from .schemas import LogRequest
+from .schemas import LogEventPayload
 
 
-def insert_log_events(logs: list[LogRequest], session: Session) -> None:
+def insert_log_events(logs: list[LogEventPayload], session: Session) -> None:
     """Convert each log into a LogEvent and add it to the session without flushing or committing.
     Sets tenant_id to DEV_TENANT_ID and ingested_at to the current UTC time for each event."""
     orm_logs = []

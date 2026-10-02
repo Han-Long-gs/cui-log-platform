@@ -1,15 +1,15 @@
-"""Request / Response Shapes
+"""Request / Response Shapes and Field Validation Functions
 ref:https://pydantic.dev/docs/validation/latest/concepts/validators/#field-validators
-
+    https://pydantic.dev/docs/validation/latest/concepts/fields/#length-constraints
 """
 
 import uuid
 from datetime import datetime
 from typing import Annotated, Any
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field
 
-LEVELS = ["INFO", "WARNING", "DEBUG", "ERROR", "CRITICAL"]
+from .constants import LEVELS, MAX_EVENTS_PER_BATCH
 
 
 def _is_number_str(string: str) -> bool:
@@ -47,7 +47,7 @@ def _validates_level(level: str) -> str:
     return normalized_level
 
 
-class LogRequest(BaseModel):
+class LogEventPayload(BaseModel):
     """A single log event in the POST /v1/logs request body.
     level is case-insensitive and normalized to upper case; it must be one of LEVELS.
     occurred_at must be an ISO 8601 string with a timezone; numbers and numeric strings are rejected.
@@ -63,7 +63,14 @@ class LogRequest(BaseModel):
     custom: dict[str, Any] | None = None
 
 
-class LogResponse(BaseModel):
+class IngestRequest(BaseModel):
+    """Request body for POST /v1/logs: an object holding the batch of log events under log_entries.
+    log_entries must contain between 1 and 200 events; the whole request body must not exceed 1 MB."""
+
+    log_entries: Annotated[list[LogEventPayload], Field(min_length=1, max_length=MAX_EVENTS_PER_BATCH)]
+
+
+class IngestResponse(BaseModel):
     """Response body returned after a batch of log events has been committed."""
 
     message: str

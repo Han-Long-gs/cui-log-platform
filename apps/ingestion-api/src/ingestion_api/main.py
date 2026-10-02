@@ -3,6 +3,8 @@ Endpoints
 ref: https://fastapi.tiangolo.com/tutorial/dependencies/#share-annotated-dependencies
     https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/
     https://fastapi.tiangolo.com/tutorial/handling-errors/
+    https://starlette.dev/middleware/#requestbodylimitmiddleware
+    https://fastapi.tiangolo.com/advanced/middleware/
 """
 
 from collections.abc import AsyncGenerator
@@ -13,9 +15,11 @@ from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
+from .constants import MAX_BODY_BYTES
 from .db import dispose_engine, ensure_dev_tenant, get_session
-from .schemas import LogRequest, LogResponse
+from .schemas import IngestRequest, IngestResponse
 from .service import insert_log_events
 
 
@@ -28,6 +32,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(lifespan=lifespan)
+
+# register the starlette middleware to the FastAPI to restrict the body size to 1MB before FastAPI reads it to its mem
+app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_BODY_BYTES)
 
 # function scope:start the dependency before the path operation function that handles the request,
 # end the dependency after the path operation function ends,
@@ -45,11 +52,11 @@ def validation_exception_handler(request: Request, ex: RequestValidationError) -
     return JSONResponse(message, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
 
 
-@app.post("/v1/logs", response_model=LogResponse, status_code=status.HTTP_201_CREATED)
-def ingest_logs(logs: list[LogRequest], session: SessionDep) -> LogResponse:
-    """Insert a batch of log events in a single transaction and respond after it is committed.
-    An invalid event rejects the whole request with 422 before anything is written;
-    a database error (e.g. duplicate event_id) rolls back the whole batch and returns 500."""
-    insert_log_events(logs, session)
+@app.post("/v1/logs", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
+def ingest_logs(body: IngestRequest, session: SessionDep) -> IngestResponse:
+    """Insert a batch of 1-200 log events (body at most 1 MiB) in one transaction; respond 201 after the commit.
+    Too large a body -> 413; an invalid event or batch size -> 422; nothing is written in either case.
+    A database error (e.g. duplicate event_id) rolls back the whole batch and returns 500."""
+    insert_log_events(body.log_entries, session)
 
-    return LogResponse(message="succeed")
+    return IngestResponse(message="succeed")
