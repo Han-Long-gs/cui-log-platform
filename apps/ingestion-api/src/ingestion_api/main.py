@@ -14,13 +14,14 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from .constants import MAX_BODY_BYTES
 from .db import dispose_engine, ensure_dev_tenant, get_session
 from .schemas import IngestRequest, IngestResponse
-from .service import insert_log_events
+from .service import check_db_connection, insert_log_events
 
 
 @asynccontextmanager
@@ -60,3 +61,21 @@ def ingest_logs(body: IngestRequest, session: SessionDep) -> IngestResponse:
     insert_log_events(body.log_entries, session)
 
     return IngestResponse(message="succeed")
+
+
+@app.get("/healthz", status_code=status.HTTP_200_OK)
+async def liveness_check() -> JSONResponse:
+    """Return 200 to show the process is up and serving HTTP; does not touch the database."""
+    return JSONResponse("ingestion-api service is up and run!")
+
+
+@app.get("/readyz", status_code=status.HTTP_200_OK)
+def readiness_check(session: SessionDep) -> JSONResponse:
+    """Run SELECT 1 against Postgres: 200 if it succeeds, 503 if the database is unreachable or the pool times out.
+    The error is printed server-side; the response body never contains its details."""
+    try:
+        check_db_connection(session)
+        return JSONResponse("ingestion-api service to db is healthy")
+    except (exc.OperationalError, exc.TimeoutError) as ex:
+        print(repr(ex))
+        return JSONResponse("Database is unavailable", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)

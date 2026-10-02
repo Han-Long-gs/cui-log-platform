@@ -1,8 +1,11 @@
-"""Business logic"""
+"""Business logic
+ref:https://docs.sqlalchemy.org/en/20/core/sqlelement.html#sqlalchemy.sql.expression.text
+"""
 
 from datetime import UTC, datetime
 
 from cui_db import LogEvent
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .db import DEV_TENANT_ID
@@ -28,3 +31,9 @@ def insert_log_events(logs: list[LogEventPayload], session: Session) -> None:
         )
         orm_logs.append(orm_log)
     session.add_all(orm_logs)
+
+
+def check_db_connection(session: Session) -> None:
+    """Execute SELECT 1 on the session; raises a SQLAlchemy error if the database cannot be reached."""
+    query = text("SELECT 1")
+    session.execute(query)

@@ -244,7 +244,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "pydantic", specifier = ">=2.13.5" },
-    { name = "starlette", specifier = "==1.7.0" },
+    { name = "starlette", specifier = ">=1.7.0" },
     { name = "uvicorn", specifier = ">=0.53.0" },
 ]
 

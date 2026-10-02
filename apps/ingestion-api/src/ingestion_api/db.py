@@ -17,7 +17,7 @@ from config import settings
 DEV_TENANT_ID = uuid.UUID("dab739d3-52a2-4efa-ae31-6afc1031f062")
 
 sync_conn_url = make_url(settings.database_url).set(drivername="postgresql+psycopg")
-engine = create_engine(sync_conn_url)
+engine = create_engine(sync_conn_url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
 session_factory = sessionmaker(engine)
 
 
