@@ -1,6 +1,7 @@
 # coding agent
 CLAUDE.md
 .claude/
+.agents/
 
 # plan docs
 docs/
@@ -18,3 +19,7 @@ __pycache__/
 .vscode/
 
 
+
+# test coverage
+.coverage
+htmlcov/

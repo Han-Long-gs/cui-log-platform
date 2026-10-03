@@ -27,6 +27,8 @@ dev = [
     "ruff>=0.8",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "httpx2>=2.13.1",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.ruff]
@@ -42,3 +44,11 @@ select = ["E", "F", "I", "UP", "B"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["apps", "packages"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
