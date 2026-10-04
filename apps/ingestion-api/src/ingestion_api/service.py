@@ -5,14 +5,14 @@ ref:https://docs.sqlalchemy.org/en/20/core/sqlelement.html#sqlalchemy.sql.expres
 from datetime import UTC, datetime
 
 from cui_db import LogEvent
+from cui_schemas.schemas import LogEntry
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .db import DEV_TENANT_ID
-from .schemas import LogEventPayload
 
 
-def insert_log_events(logs: list[LogEventPayload], session: Session) -> None:
+def insert_log_events(logs: list[LogEntry], session: Session) -> None:
     """Convert each log into a LogEvent and add it to the session without flushing or committing.
     Sets tenant_id to DEV_TENANT_ID and ingested_at to the current UTC time for each event."""
     orm_logs = []

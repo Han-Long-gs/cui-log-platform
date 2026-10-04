@@ -8,15 +8,15 @@ from unittest.mock import MagicMock
 
 import pytest
 from cui_db import LogEvent
+from cui_schemas.schemas import LogEntry
 from ingestion_api.db import DEV_TENANT_ID
-from ingestion_api.schemas import LogEventPayload
 from ingestion_api.service import check_db_connection, insert_log_events
 from sqlalchemy import exc
 
 
 def insert(session: MagicMock, *events: dict[str, Any]) -> list[LogEvent]:
     """Run insert_log_events on the given event dicts; assert one add_all call and return what it received."""
-    insert_log_events([LogEventPayload.model_validate(event) for event in events], session)
+    insert_log_events([LogEntry.model_validate(event) for event in events], session)
     session.add_all.assert_called_once()
     return list(session.add_all.call_args.args[0])
 
@@ -49,7 +49,7 @@ def test_insert_copies_fields_and_stamps_ingested_at(
 ) -> None:
     """Every payload field is copied unchanged and ingested_at is an aware time taken during the call."""
     event = make_event(level="error", trace_id=str(uuid.uuid4()), custom={"user_id": 42})
-    payload = LogEventPayload.model_validate(event)
+    payload = LogEntry.model_validate(event)
     before = datetime.now(UTC)
     (log,) = insert(session, event)
     after = datetime.now(UTC)

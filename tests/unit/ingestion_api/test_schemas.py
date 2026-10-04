@@ -1,4 +1,4 @@
-"""Unit tests for ingestion_api.schemas (LogEventPayload / IngestRequest).
+"""Unit tests for ingestion_api.schemas (LogEntry / IngestRequest).
 
 Pure Pydantic validation: no server, no database. Each test builds the models directly.
 """
@@ -9,15 +9,17 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
-from ingestion_api.constants import LEVELS, MAX_EVENTS_PER_BATCH
-from ingestion_api.schemas import IngestRequest, LogEventPayload
+from cui_schemas.constants import LEVELS
+from cui_schemas.schemas import LogEntry
+from ingestion_api.constants import MAX_EVENTS_PER_BATCH
+from ingestion_api.schemas import IngestRequest
 from pydantic import ValidationError
 
 
 def rejected_fields(event: dict[str, Any]) -> set[str]:
     """Assert the event fails validation and return the names of the failing fields."""
     with pytest.raises(ValidationError) as exc:
-        LogEventPayload(**event)
+        LogEntry(**event)
     return {str(err["loc"][-1]) for err in exc.value.errors()}
 
 
@@ -27,13 +29,13 @@ def rejected_fields(event: dict[str, Any]) -> set[str]:
 @pytest.mark.parametrize("raw", ["error", "Error", "ERROR", " ERROR ", "\terror\n"])
 def test_level_normalized_to_upper(make_event: Callable[..., dict[str, Any]], raw: str) -> None:
     """Case and surrounding whitespace are normalized away."""
-    assert LogEventPayload(**make_event(level=raw)).level == "ERROR"
+    assert LogEntry(**make_event(level=raw)).level == "ERROR"
 
 
 @pytest.mark.parametrize("level", LEVELS)
 def test_level_all_standard_values_accepted(make_event: Callable[..., dict[str, Any]], level: str) -> None:
     """Every standard level passes unchanged."""
-    assert LogEventPayload(**make_event(level=level)).level == level
+    assert LogEntry(**make_event(level=level)).level == level
 
 
 @pytest.mark.parametrize("raw", ["verbose", "warn", "fatal", "", "   ", "ERR OR"])
@@ -58,7 +60,7 @@ def test_occurred_at_with_timezone_accepted_and_offset_kept(
     make_event: Callable[..., dict[str, Any]], raw: str, offset_hours: int
 ) -> None:
     """Any timezone is accepted and the original offset is preserved (no conversion to UTC)."""
-    ts = LogEventPayload(**make_event(occurred_at=raw)).occurred_at
+    ts = LogEntry(**make_event(occurred_at=raw)).occurred_at
     assert ts.utcoffset() == timedelta(hours=offset_hours)
 
 
@@ -85,7 +87,7 @@ def test_occurred_at_garbage_rejected(make_event: Callable[..., dict[str, Any]],
 
 def test_optional_fields_default_to_none(make_event: Callable[..., dict[str, Any]]) -> None:
     """trace_id and custom may be omitted."""
-    event = LogEventPayload(**make_event())
+    event = LogEntry(**make_event())
     assert event.trace_id is None
     assert event.custom is None
 
@@ -93,14 +95,14 @@ def test_optional_fields_default_to_none(make_event: Callable[..., dict[str, Any
 def test_optional_fields_accept_values(make_event: Callable[..., dict[str, Any]]) -> None:
     """trace_id and custom are kept when provided."""
     trace_id = uuid.uuid4()
-    event = LogEventPayload(**make_event(trace_id=str(trace_id), custom={"k": [1, 2]}))
+    event = LogEntry(**make_event(trace_id=str(trace_id), custom={"k": [1, 2]}))
     assert event.trace_id == trace_id
     assert event.custom == {"k": [1, 2]}
 
 
 def test_extra_tenant_id_ignored(make_event: Callable[..., dict[str, Any]]) -> None:
     """A forged tenant_id in the payload is dropped and never reaches the model."""
-    event = LogEventPayload(**make_event(tenant_id=str(uuid.uuid4())))
+    event = LogEntry(**make_event(tenant_id=str(uuid.uuid4())))
     assert not hasattr(event, "tenant_id")
     assert "tenant_id" not in event.model_dump()
 
