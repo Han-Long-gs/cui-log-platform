@@ -20,7 +20,6 @@ members = [
 
 [tool.uv.sources]
 cui-db = { workspace = true }
-cui-messaging = { workspace = true }
 cui-schemas = { workspace = true }
 
 [dependency-groups]
