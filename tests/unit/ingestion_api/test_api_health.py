@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from ingestion_api import main
+from ingestion_api import sync_router
 from sqlalchemy import exc
 
 SECRET = "db.internal.example:5432 password=hunter2"
@@ -13,8 +13,8 @@ SECRET = "db.internal.example:5432 password=hunter2"
 
 @pytest.fixture
 def db_check() -> Generator[MagicMock]:
-    """Mock check_db_connection in main; it succeeds unless a test sets side_effect."""
-    with patch.object(main, "check_db_connection", autospec=True) as mock:
+    """Mock check_db_connection where sync_router looks it up; it succeeds unless a test sets side_effect."""
+    with patch.object(sync_router, "check_db_connection", autospec=True) as mock:
         yield mock
 
 

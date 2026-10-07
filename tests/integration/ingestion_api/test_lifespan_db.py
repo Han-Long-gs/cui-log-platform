@@ -6,7 +6,7 @@ from unittest.mock import patch
 from cui_db import Tenant
 from fastapi.testclient import TestClient
 from ingestion_api import db, main
-from ingestion_api.db import DEV_TENANT_ID
+from ingestion_api.constants import DEV_TENANT_ID
 from ingestion_api.main import app
 from sqlalchemy import select
 from sqlalchemy.orm import Session

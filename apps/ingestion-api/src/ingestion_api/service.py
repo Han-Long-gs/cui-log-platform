@@ -9,7 +9,7 @@ from cui_schemas.schemas import LogEntry
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .db import DEV_TENANT_ID
+from .constants import DEV_TENANT_ID
 
 
 def insert_log_events(logs: list[LogEntry], session: Session) -> None:
