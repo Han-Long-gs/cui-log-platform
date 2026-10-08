@@ -7,9 +7,6 @@ ref: https://fastapi.tiangolo.com/tutorial/dependencies/#share-annotated-depende
     https://fastapi.tiangolo.com/advanced/middleware/
 """
 
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -18,20 +15,10 @@ from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 from config import settings
 
 from .constants import MAX_BODY_BYTES
-from .db import dispose_engine, ensure_dev_tenant
 from .queue_router import queue_router
 from .sync_router import sync_router
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Ensure the dev tenant exists on startup and dispose the engine (closing pooled DB connections) on shutdown."""
-    ensure_dev_tenant()
-    yield
-    dispose_engine()
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 # register the starlette middleware to the FastAPI to restrict the body size to 1MB before FastAPI reads it to its mem
 app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_BODY_BYTES)

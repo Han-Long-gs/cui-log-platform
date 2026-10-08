@@ -1,4 +1,4 @@
-"""HTTP-layer limits for the ingestion API."""
+"""HTTP-layer limits and the fixed development tenant id for the ingestion API."""
 
 import uuid
 

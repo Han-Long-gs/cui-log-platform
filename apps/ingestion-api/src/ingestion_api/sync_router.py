@@ -1,15 +1,29 @@
+"""Routes for sync mode: write each batch straight to Postgres."""
+
+import uuid
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, FastAPI, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
 
-from .db import get_session
+from .db import dispose_engine, ensure_dev_tenant, get_session
 from .schemas import IngestRequest, IngestResponse
 from .service import check_db_connection, insert_log_events
 
-sync_router = APIRouter()
+
+@asynccontextmanager
+async def sync_router_lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    """Ensure the dev tenant exists on startup and dispose the engine (closing pooled DB connections) on shutdown."""
+    ensure_dev_tenant()
+    yield
+    dispose_engine()
+
+
+sync_router = APIRouter(lifespan=sync_router_lifespan)
 
 # function scope:start the dependency before the path operation function that handles the request,
 # end the dependency after the path operation function ends,
@@ -22,9 +36,10 @@ def ingest_logs(body: IngestRequest, session: SessionDep) -> IngestResponse:
     """Insert a batch of 1-200 log events (body at most 1 MiB) in one transaction; respond 201 after the commit.
     Too large a body -> 413; an invalid event or batch size -> 422; nothing is written in either case.
     A database error (e.g. duplicate event_id) rolls back the whole batch and returns 500."""
+    batch_id = uuid.uuid4()
     insert_log_events(body.log_entries, session)
 
-    return IngestResponse(message="succeed")
+    return IngestResponse(batch_id=batch_id, message="succeed")
 
 
 @sync_router.get("/readyz", status_code=status.HTTP_200_OK)
