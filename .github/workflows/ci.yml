@@ -75,7 +75,9 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test
       BROKER_URL: amqp://cui:cui@127.0.0.1:5672//
+      # same as .env.test; tests that need a specific mode build their own app (build_app fixture)
       INGEST_MODE: sync
+      ALLOW_INGEST_SYNC: "true"
 
     steps:
       - name: Checkout code
