@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from cui_db import LogEvent
 from cui_schemas.schemas import LogEntry
-from ingestion_api.db import DEV_TENANT_ID
+from ingestion_api.constants import DEV_TENANT_ID
 from ingestion_api.service import check_db_connection, insert_log_events
 from sqlalchemy import exc
 

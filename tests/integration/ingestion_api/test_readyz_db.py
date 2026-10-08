@@ -1,11 +1,11 @@
-"""GET /readyz against a real database, and against a port where nothing is listening."""
+"""Sync-mode GET /readyz against a real database, and against a port where nothing is listening."""
 
 from collections.abc import Generator
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from ingestion_api import db
-from ingestion_api.main import app
 from ingestion_api.service import check_db_connection
 from sqlalchemy import Engine, create_engine, exc
 from sqlalchemy.orm import Session
@@ -20,16 +20,16 @@ def unreachable_engine() -> Generator[Engine]:
 
 
 @pytest.fixture
-def unreachable_client(client: TestClient, unreachable_engine: Engine) -> Generator[TestClient]:
+def unreachable_client(client: TestClient, sync_app: FastAPI, unreachable_engine: Engine) -> Generator[TestClient]:
     """The lifespan client, with every request's session bound to the unreachable engine."""
 
     def unreachable_session() -> Generator[Session]:
         with Session(unreachable_engine) as session:
             yield session
 
-    app.dependency_overrides[db.get_session] = unreachable_session
+    sync_app.dependency_overrides[db.get_session] = unreachable_session
     yield client
-    app.dependency_overrides.clear()
+    sync_app.dependency_overrides.clear()
 
 
 def test_readyz_returns_200_with_real_db(client: TestClient) -> None:

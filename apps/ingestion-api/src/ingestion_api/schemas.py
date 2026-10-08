@@ -3,6 +3,7 @@ ref:https://pydantic.dev/docs/validation/latest/concepts/validators/#field-valid
     https://pydantic.dev/docs/validation/latest/concepts/fields/#length-constraints
 """
 
+import uuid
 from typing import Annotated
 
 from cui_schemas.schemas import LogEntry
@@ -19,6 +20,7 @@ class IngestRequest(BaseModel):
 
 
 class IngestResponse(BaseModel):
-    """Response body returned after a batch of log events has been committed."""
+    """Response body returned after a batch of log events has been accepted (queue mode) / committed (sync mode)."""
 
+    batch_id: uuid.UUID
     message: str

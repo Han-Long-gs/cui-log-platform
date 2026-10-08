@@ -55,9 +55,29 @@ jobs:
           # Maps tcp port 5432 on service container to the host
           - 5432:5432
 
+      rabbitmq:
+        image: rabbitmq:4.2
+        env:
+          # the built-in guest user may only connect from inside the container (loopback);
+          # port-mapped connections from the runner come from the Docker bridge, so define a real user
+          RABBITMQ_DEFAULT_USER: cui
+          RABBITMQ_DEFAULT_PASS: cui
+        # wait until the AMQP listener is up, not just the container
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5672:5672
+
     # env for project
     env:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test
+      BROKER_URL: amqp://cui:cui@127.0.0.1:5672//
+      # same as .env.test; tests that need a specific mode build their own app (build_app fixture)
+      INGEST_MODE: sync
+      ALLOW_INGEST_SYNC: "true"
 
     steps:
       - name: Checkout code

@@ -1,0 +1,16 @@
+[project]
+name = "cui-messaging"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "celery>=5.6.3",
+    "cui-schemas",
+    "pydantic>=2.13.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cui_messaging"]

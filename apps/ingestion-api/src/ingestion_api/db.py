@@ -3,7 +3,6 @@ Handles the creation of the db engine and db ops
 ref: https://docs.sqlalchemy.org/en/21/orm/session_basics.html
 """
 
-import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime
 
@@ -14,7 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from config import settings
 
-DEV_TENANT_ID = uuid.UUID("dab739d3-52a2-4efa-ae31-6afc1031f062")
+from .constants import DEV_TENANT_ID
 
 sync_conn_url = make_url(settings.database_url).set(drivername="postgresql+psycopg")
 engine = create_engine(sync_conn_url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
