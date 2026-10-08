@@ -4,9 +4,9 @@ from collections.abc import Callable, Generator
 
 import pytest
 from cui_db import LogEvent
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from ingestion_api import db
-from ingestion_api.main import app
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
@@ -33,10 +33,10 @@ def empty_tables() -> Generator[None]:
 
 
 @pytest.fixture
-def client() -> Generator[TestClient]:
-    """A TestClient that runs the app lifespan (creates the dev tenant on enter, disposes the engine on exit).
+def client(sync_app: FastAPI) -> Generator[TestClient]:
+    """A sync-mode TestClient that runs the lifespan (creates the dev tenant on enter, disposes the engine on exit).
     Server errors come back as 500 responses instead of being raised in the test."""
-    with TestClient(app, raise_server_exceptions=False) as test_client:
+    with TestClient(sync_app, raise_server_exceptions=False) as test_client:
         yield test_client
 
 

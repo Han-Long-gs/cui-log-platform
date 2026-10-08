@@ -45,6 +45,8 @@ select = ["E", "F", "I", "UP", "B"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+# importlib mode lets test files in different folders share a basename (e.g. two test_schemas.py)
+addopts = "--import-mode=importlib"
 
 [tool.coverage.run]
 source = ["apps", "packages"]

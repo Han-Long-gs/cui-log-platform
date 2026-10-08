@@ -1,10 +1,12 @@
+import importlib
 import uuid
 from collections.abc import AsyncGenerator, Callable, Generator
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 import pytest_asyncio
 from cui_db import Base
+from fastapi import FastAPI
 from sqlalchemy import create_engine, pool
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
@@ -63,3 +65,32 @@ def make_event() -> Callable[..., dict[str, Any]]:
         } | overrides
 
     return factory
+
+
+@pytest.fixture
+def build_app(monkeypatch: pytest.MonkeyPatch) -> Generator[Callable[[Literal["sync", "queue"]], FastAPI]]:
+    """Return a function that rebuilds ingestion_api.main.app for the given ingest mode.
+    The mode is chosen when main is imported, so the module is reloaded; it is reloaded again with the real settings
+    afterwards."""
+    from ingestion_api import main
+
+    def build(mode: Literal["sync", "queue"]) -> FastAPI:
+        monkeypatch.setattr(settings, "ingest_mode", mode)
+        monkeypatch.setattr(settings, "allow_ingest_sync", mode == "sync")
+        return importlib.reload(main).app
+
+    yield build
+    monkeypatch.undo()
+    importlib.reload(main)
+
+
+@pytest.fixture
+def sync_app(build_app: Callable[[Literal["sync", "queue"]], FastAPI]) -> FastAPI:
+    """The ingestion app built in sync mode (writes to Postgres, answers 201)."""
+    return build_app("sync")
+
+
+@pytest.fixture
+def queue_app(build_app: Callable[[Literal["sync", "queue"]], FastAPI]) -> FastAPI:
+    """The ingestion app built in queue mode (publishes to the broker, answers 202)."""
+    return build_app("queue")
