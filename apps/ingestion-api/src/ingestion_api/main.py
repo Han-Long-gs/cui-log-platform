@@ -7,12 +7,11 @@ ref: https://fastapi.tiangolo.com/tutorial/dependencies/#share-annotated-depende
     https://fastapi.tiangolo.com/advanced/middleware/
 """
 
+from cui_config import settings
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
-
-from config import settings
 
 from .constants import MAX_BODY_BYTES
 from .queue_router import queue_router

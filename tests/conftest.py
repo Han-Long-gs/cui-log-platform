@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 import pytest
 import pytest_asyncio
+from cui_config import settings
 from cui_db import Base
 from fastapi import FastAPI
 from sqlalchemy import create_engine, pool
@@ -15,8 +16,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-
-from config import settings
 
 
 @pytest.fixture(scope="session")

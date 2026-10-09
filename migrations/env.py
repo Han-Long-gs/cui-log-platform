@@ -2,12 +2,11 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
+from cui_config import settings
 from cui_db.base import Base
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
-
-from config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

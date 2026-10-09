@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from time import perf_counter
 
+from cui_config import settings
 from cui_db import LogEvent, Tenant
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import (
@@ -13,8 +14,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-
-from config import settings
 
 
 async def insert_tenant(session: AsyncSession) -> uuid.UUID:

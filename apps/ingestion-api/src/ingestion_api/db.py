@@ -6,12 +6,11 @@ ref: https://docs.sqlalchemy.org/en/21/orm/session_basics.html
 from collections.abc import Generator
 from datetime import UTC, datetime
 
+from cui_config import settings
 from cui_db import Tenant
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
-
-from config import settings
 
 from .constants import DEV_TENANT_ID
 

@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 [manifest]
 members = [
     "cui-app",
+    "cui-config",
     "cui-db",
     "cui-messaging",
     "cui-schemas",
@@ -251,6 +252,7 @@ name = "cui-app"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "cui-config" },
     { name = "cui-db" },
     { name = "pydantic-settings" },
 ]
@@ -266,6 +268,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cui-config", editable = "packages/config" },
     { name = "cui-db", editable = "packages/db" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
 ]
@@ -277,6 +280,21 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.8" },
+]
+
+[[package]]
+name = "cui-config"
+version = "0.1.0"
+source = { editable = "packages/config" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.13.5" },
+    { name = "pydantic-settings", specifier = ">=2.15.0" },
 ]
 
 [[package]]
@@ -450,6 +468,7 @@ name = "ingestion-api"
 version = "0.1.0"
 source = { editable = "apps/ingestion-api" }
 dependencies = [
+    { name = "cui-config" },
     { name = "cui-db" },
     { name = "cui-messaging" },
     { name = "cui-schemas" },
@@ -462,6 +481,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cui-config", editable = "packages/config" },
     { name = "cui-db", editable = "packages/db" },
     { name = "cui-messaging", editable = "packages/messaging" },
     { name = "cui-schemas", editable = "packages/schemas" },

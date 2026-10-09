@@ -1,9 +1,8 @@
 """Settings validation: ingest mode values, the sync-mode permission, defaults, and no secrets in errors."""
 
 import pytest
+from cui_config import Settings
 from pydantic import ValidationError
-
-from config import Settings
 
 DB_URL = "postgresql+asyncpg://u:dbsecret@db:5432/x"
 BROKER_URL = "amqp://u:brokersecret@broker:5672//"

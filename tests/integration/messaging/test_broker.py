@@ -3,10 +3,9 @@
 import time
 
 import pytest
+from cui_config import settings
 from cui_messaging import BrokerDownError, check_broker_connection, make_celery_app
 from kombu import exceptions as kombu_exc
-
-from config import settings
 
 UNREACHABLE_URL = "amqp://guest:guest@127.0.0.1:1//"
 

@@ -3,11 +3,10 @@
 import uuid
 from datetime import UTC, datetime
 
+from cui_config import settings
 from cui_messaging import BatchMessage, BrokerDownError, check_broker_connection, make_celery_app, send_batch_msg
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
-
-from config import settings
 
 from .constants import DEV_TENANT_ID
 from .schemas import IngestRequest, IngestResponse
