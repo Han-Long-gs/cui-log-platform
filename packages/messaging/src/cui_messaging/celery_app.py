@@ -5,6 +5,7 @@ ref:https://docs.celeryq.dev/en/stable/getting-started/first-steps-with-celery.h
     https://docs.celeryq.dev/en/stable/userguide/configuration.html
     celery->app->defaults.py->NAMESPACES for args
     https://docs.celeryq.dev/en/stable/userguide/calling.html#message-sending-retry
+    https://stackoverflow.com/questions/69107860/celery-what-is-the-reason-to-have-acks-late-true-without-setting-task-reject-on
 """
 
 from celery import Celery
@@ -30,6 +31,10 @@ def make_celery_app(broker_url: str) -> Celery:
             "confirm_publish": True  # wait for ack from broker
         },
         task_publish_retry_policy={"max_retries": 1, "interval_start": 0, "interval_step": 0.2, "interval_max": 1},
+        # consumers' configs (celery worker)
+        worker_prefetch_multiplier=1,
+        task_reject_on_worker_lost=True,
+        task_acks_late=True,
     )
     return app
 

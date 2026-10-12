@@ -1,0 +1,23 @@
+[project]
+name = "worker"
+version = "0.1.0"
+authors = [
+    { name = "Han Long", email = "hanlong.gensosanso@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "celery>=5.6.3",
+    "cui-config",
+    "cui-messaging",
+    "cui-schemas",
+    "pydantic>=2.13.5",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+cui-config = { workspace = true }
+cui-messaging = { workspace = true }
+cui-schemas = { workspace = true }
