@@ -19,7 +19,7 @@ INGEST_BATCH_ARG_NAME = "batch_message"
 
 
 def make_celery_app(broker_url: str) -> Celery:
-    """Build a Celery app with the serializer, timeout, publisher-confirm and retry settings.
+    """Build a Celery app with the serializer, timeout, publisher-confirm, retry, late-ack and prefetch settings.
     Producer and consumer both build their app here so the two sides agree."""
     app = Celery("cui", broker=broker_url)
     app.conf.update(

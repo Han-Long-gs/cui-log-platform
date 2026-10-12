@@ -2,29 +2,21 @@
 
 import json
 from collections.abc import Callable
-from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from celery import Celery
 from cui_messaging import BatchMessage, BrokerDownError, check_broker_connection, make_celery_app, send_batch_msg
 from cui_messaging.celery_app import INGEST_BATCH_ARG_NAME, INGEST_BATCH_TASK_NAME
-from cui_schemas.schemas import LogEntry
 from kombu import exceptions as kombu_exc
 
 BROKER_URL = "amqp://u:p@broker:5672//"
 
 
 @pytest.fixture
-def message(make_event: Callable[..., dict[str, Any]]) -> BatchMessage:
+def message(make_batch: Callable[..., BatchMessage]) -> BatchMessage:
     """A valid one-entry batch."""
-    return BatchMessage(
-        batch_id="11111111-1111-1111-1111-111111111111",
-        tenant_id="22222222-2222-2222-2222-222222222222",
-        received_at=datetime(2026, 10, 8, 4, 26, tzinfo=UTC),
-        log_entries=[LogEntry.model_validate(make_event())],
-    )
+    return make_batch()
 
 
 @pytest.fixture
@@ -61,6 +53,21 @@ def test_app_bounds_connection_time() -> None:
 def test_app_retries_a_failed_publish_once() -> None:
     """A failed publish is retried exactly once, so a dead broker turns into an error within seconds."""
     assert make_celery_app(BROKER_URL).conf.task_publish_retry_policy["max_retries"] == 1
+
+
+def test_app_acks_a_task_only_after_it_has_run() -> None:
+    """Late ack: a message stays unacked while its task runs, so a dead worker's messages are redelivered."""
+    assert make_celery_app(BROKER_URL).conf.task_acks_late is True
+
+
+def test_app_requeues_the_task_of_a_killed_child_process() -> None:
+    """Without this the main process acks the message of a child that died mid-task, and the batch is lost."""
+    assert make_celery_app(BROKER_URL).conf.task_reject_on_worker_lost is True
+
+
+def test_app_prefetches_one_message_per_child_process() -> None:
+    """The worker holds no messages beyond the ones its child processes are running."""
+    assert make_celery_app(BROKER_URL).conf.worker_prefetch_multiplier == 1
 
 
 def test_app_has_no_misspelled_settings() -> None:

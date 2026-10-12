@@ -1,12 +1,15 @@
 import importlib
 import uuid
 from collections.abc import AsyncGenerator, Callable, Generator
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import pytest
 import pytest_asyncio
 from cui_config import settings
 from cui_db import Base
+from cui_messaging import BatchMessage
+from cui_schemas.schemas import LogEntry
 from fastapi import FastAPI
 from sqlalchemy import create_engine, pool
 from sqlalchemy.engine import make_url
@@ -62,6 +65,21 @@ def make_event() -> Callable[..., dict[str, Any]]:
             "message": "hello",
             "occurred_at": "2026-10-03T10:00:00Z",
         } | overrides
+
+    return factory
+
+
+@pytest.fixture
+def make_batch(make_event: Callable[..., dict[str, Any]]) -> Callable[..., BatchMessage]:
+    """Return a factory for valid BatchMessages; `entries` sets how many log entries the batch carries."""
+
+    def factory(entries: int = 1) -> BatchMessage:
+        return BatchMessage(
+            batch_id="11111111-1111-1111-1111-111111111111",
+            tenant_id="22222222-2222-2222-2222-222222222222",
+            received_at=datetime(2026, 10, 8, 4, 26, tzinfo=UTC),
+            log_entries=[LogEntry.model_validate(make_event()) for _ in range(entries)],
+        )
 
     return factory
 
