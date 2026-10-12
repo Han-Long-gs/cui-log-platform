@@ -11,11 +11,12 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from cui_db import DEV_TENANT_ID
 from cui_messaging import BatchMessage, BrokerDownError
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from ingestion_api import queue_router
-from ingestion_api.constants import DEV_TENANT_ID, MAX_BODY_BYTES
+from ingestion_api.constants import MAX_BODY_BYTES
 
 SECRET = "amqp://cui:hunter2@broker.internal:5672//"
 

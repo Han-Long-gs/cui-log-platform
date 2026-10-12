@@ -5,12 +5,13 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
+from cui_db import ensure_dev_tenant
 from fastapi import APIRouter, Depends, FastAPI, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
 
-from .db import dispose_engine, ensure_dev_tenant, get_session
+from .db import dispose_engine, get_session, session_factory
 from .schemas import IngestRequest, IngestResponse
 from .service import check_db_connection, insert_log_events
 
@@ -18,7 +19,7 @@ from .service import check_db_connection, insert_log_events
 @asynccontextmanager
 async def sync_router_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Ensure the dev tenant exists on startup and dispose the engine (closing pooled DB connections) on shutdown."""
-    ensure_dev_tenant()
+    ensure_dev_tenant(session_factory=session_factory)
     yield
     dispose_engine()
 

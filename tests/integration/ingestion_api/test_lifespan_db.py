@@ -3,11 +3,10 @@
 import uuid
 from unittest.mock import patch
 
-from cui_db import Tenant
+from cui_db import DEV_TENANT_ID, Tenant
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from ingestion_api import db, sync_router
-from ingestion_api.constants import DEV_TENANT_ID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

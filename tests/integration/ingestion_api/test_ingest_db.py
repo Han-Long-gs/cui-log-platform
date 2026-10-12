@@ -5,10 +5,10 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from cui_db import LogEvent
+from cui_db import DEV_TENANT_ID, LogEvent
 from fastapi.testclient import TestClient
 from ingestion_api import db
-from ingestion_api.constants import DEV_TENANT_ID, MAX_EVENTS_PER_BATCH
+from ingestion_api.constants import MAX_EVENTS_PER_BATCH
 from sqlalchemy import text
 
 

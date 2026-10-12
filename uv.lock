@@ -304,6 +304,7 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "greenlet" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "sqlalchemy" },
 ]
 
@@ -312,6 +313,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "asyncpg", specifier = ">=0.29" },
     { name = "greenlet", specifier = ">=3.5.5" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]
 
@@ -950,6 +952,7 @@ source = { editable = "apps/worker" }
 dependencies = [
     { name = "celery" },
     { name = "cui-config" },
+    { name = "cui-db" },
     { name = "cui-messaging" },
     { name = "cui-schemas" },
     { name = "pydantic" },
@@ -959,6 +962,7 @@ dependencies = [
 requires-dist = [
     { name = "celery", specifier = ">=5.6.3" },
     { name = "cui-config", editable = "packages/config" },
+    { name = "cui-db", editable = "packages/db" },
     { name = "cui-messaging", editable = "packages/messaging" },
     { name = "cui-schemas", editable = "packages/schemas" },
     { name = "pydantic", specifier = ">=2.13.5" },

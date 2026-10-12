@@ -4,12 +4,10 @@ ref:https://docs.sqlalchemy.org/en/20/core/sqlelement.html#sqlalchemy.sql.expres
 
 from datetime import UTC, datetime
 
-from cui_db import LogEvent
+from cui_db import DEV_TENANT_ID, LogEvent
 from cui_schemas.schemas import LogEntry
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-from .constants import DEV_TENANT_ID
 
 
 def insert_log_events(logs: list[LogEntry], session: Session) -> None:

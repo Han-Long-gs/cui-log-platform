@@ -8,6 +8,7 @@ requires-python = ">=3.14"
 dependencies = [
     "celery>=5.6.3",
     "cui-config",
+    "cui-db",
     "cui-messaging",
     "cui-schemas",
     "pydantic>=2.13.5",
@@ -19,5 +20,6 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 cui-config = { workspace = true }
+cui-db = { workspace = true }
 cui-messaging = { workspace = true }
 cui-schemas = { workspace = true }
