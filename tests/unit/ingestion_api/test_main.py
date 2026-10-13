@@ -55,6 +55,6 @@ def test_sync_startup_runs_the_database_lifespan(sync_app: FastAPI) -> None:
         patch.object(sync_router, "dispose_engine", autospec=True) as dispose,
     ):
         with TestClient(sync_app):
-            ensure.assert_called_once()
+            ensure.assert_called_once_with(session_factory=db.session_factory)
             dispose.assert_not_called()
         dispose.assert_called_once()

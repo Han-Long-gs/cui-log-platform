@@ -1,12 +1,13 @@
 """worker.tasks: the ingest_batch task is registered under the agreed name, takes what the API publishes,
-validates it again and logs which batch it got. Nothing here needs a broker."""
+validates it again, logs which batch it got and hands it to the write function. Nothing here needs a broker or a
+database: worker.service.ingest_batch_to_pg is replaced by a mock (its own tests are in tests/integration/worker)."""
 
 import importlib
 import json
 import logging
 from collections.abc import Callable, Generator
 from typing import Any
-from unittest.mock import create_autospec
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from celery import Celery
@@ -14,6 +15,7 @@ from cui_config import settings
 from cui_messaging import INGEST_BATCH_ARG_NAME, INGEST_BATCH_TASK_NAME, BatchMessage, send_batch_msg
 from pydantic import ValidationError
 from worker import tasks
+from worker.service import ingest_batch_to_pg
 
 BROKER_URL = "amqp://u:p@test-broker:5672//"
 
@@ -22,6 +24,14 @@ BROKER_URL = "amqp://u:p@test-broker:5672//"
 def payload(make_batch: Callable[..., BatchMessage]) -> dict[str, Any]:
     """A three-entry batch the way it arrives from the broker: plain JSON types."""
     return make_batch(entries=3).model_dump(mode="json")
+
+
+@pytest.fixture(autouse=True)
+def write_batch(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Replace the function the task writes with, so no test in this file touches the database."""
+    mock = create_autospec(ingest_batch_to_pg)
+    monkeypatch.setattr(tasks, "ingest_batch_to_pg", mock)
+    return mock
 
 
 @pytest.fixture
@@ -77,15 +87,30 @@ def test_task_logs_which_batch_it_received(payload: dict[str, Any], caplog: pyte
     assert "num_entries: 3" in caplog.text
 
 
-def test_task_rejects_a_message_without_a_tenant(payload: dict[str, Any]) -> None:
+def test_task_writes_the_validated_batch(payload: dict[str, Any], write_batch: MagicMock) -> None:
+    """The batch is written once, as a BatchMessage, through the worker's session factory."""
+    tasks.ingest_batch(**{INGEST_BATCH_ARG_NAME: payload})
+    write_batch.assert_called_once_with(tasks.session_factory, BatchMessage.model_validate(payload))
+
+
+def test_task_fails_when_the_write_fails(payload: dict[str, Any], write_batch: MagicMock) -> None:
+    """An error from the write is not swallowed: the task fails with it."""
+    write_batch.side_effect = RuntimeError("database is down")
+    with pytest.raises(RuntimeError, match="database is down"):
+        tasks.ingest_batch(**{INGEST_BATCH_ARG_NAME: payload})
+
+
+def test_task_rejects_a_message_without_a_tenant(payload: dict[str, Any], write_batch: MagicMock) -> None:
     """The worker validates the message again instead of trusting whatever is in the queue."""
     del payload["tenant_id"]
     with pytest.raises(ValidationError, match="tenant_id"):
         tasks.ingest_batch(**{INGEST_BATCH_ARG_NAME: payload})
+    write_batch.assert_not_called()
 
 
-def test_task_rejects_a_message_with_an_invalid_entry(payload: dict[str, Any]) -> None:
+def test_task_rejects_a_message_with_an_invalid_entry(payload: dict[str, Any], write_batch: MagicMock) -> None:
     """Every log entry is validated again too: one bad entry fails the whole batch."""
     payload["log_entries"][1]["level"] = "verbose"
     with pytest.raises(ValidationError, match="level"):
         tasks.ingest_batch(**{INGEST_BATCH_ARG_NAME: payload})
+    write_batch.assert_not_called()

@@ -7,10 +7,13 @@ ref:https://docs.sqlalchemy.org/en/21/dialects/postgresql.html#postgresql-insert
 from cui_db import LogEvent
 from cui_messaging import BatchMessage
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 
-def ingest_batch_to_pg(session_factory: sessionmaker, batch: BatchMessage) -> None:
+def ingest_batch_to_pg(session_factory: sessionmaker[Session], batch: BatchMessage) -> None:
+    """Insert one log_events row per entry of the batch in a single statement and transaction, then commit.
+    Rows get the batch's tenant_id and received_at (as ingested_at); events the tenant already has are skipped.
+    Raises a SQLAlchemy error and writes nothing if the database rejects the batch (e.g. unknown tenant)."""
     with session_factory.begin() as session:
         log_events = []
         for entry in batch.log_entries:
