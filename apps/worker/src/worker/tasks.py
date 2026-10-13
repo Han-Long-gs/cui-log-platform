@@ -8,6 +8,9 @@ from celery.utils.log import get_task_logger
 from cui_config import settings
 from cui_messaging import INGEST_BATCH_TASK_NAME, BatchMessage, make_celery_app
 
+from .db import session_factory
+from .service import ingest_batch_to_pg
+
 celery_app = make_celery_app(broker_url=settings.broker_url)
 logger = get_task_logger(__name__)
 
@@ -22,3 +25,4 @@ def ingest_batch(batch_message: dict) -> None:
         f"\n---WORKING ON TASK---\n"
         f"batch_id: {batch.batch_id}, tenant_id: {batch.tenant_id}, num_entries: {len(batch.log_entries)}"
     )
+    ingest_batch_to_pg(session_factory, batch)
