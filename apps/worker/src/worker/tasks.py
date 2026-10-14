@@ -1,4 +1,4 @@
-"""Tasks Registry
+"""Celery app and tasks of the worker.
 ref:https://docs.celeryq.dev/en/stable/userguide/tasks.html
     https://docs.celeryq.dev/en/stable/userguide/workers.html
     https://docs.celeryq.dev/en/stable/userguide/optimizing.html#optimizing-prefetch-limit
@@ -18,10 +18,9 @@ logger = get_task_logger(__name__)
 
 @celery_app.task(name=INGEST_BATCH_TASK_NAME)
 def ingest_batch(batch_message: dict) -> None:
-    """Validate one ingest batch message, log its batch id, tenant id and entry count, and write it to log_events.
-    Raises pydantic.ValidationError if the message does not match BatchMessage; a failed write raises its error.
+    """Validate one batch message, mark it PROCESSING, write it, or mark it FAILED; skip a batch already persisted.
+    Invalid message: records a FAILED row if its ids are present, then raises ValidationError; a failed write raises.
     The parameter name must equal cui_messaging.INGEST_BATCH_ARG_NAME: the publisher sends the batch under it."""
-
     try:
         batch = BatchMessage.model_validate(batch_message)
     except ValidationError:

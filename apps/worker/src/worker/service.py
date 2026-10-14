@@ -1,4 +1,4 @@
-"""Service Layer of celery worker
+"""Worker database writes: the ingest_batches status row of a batch and its log_events rows.
 ref:https://docs.sqlalchemy.org/en/21/dialects/postgresql.html#postgresql-insert-on-conflict
     https://docs.sqlalchemy.org/en/21/orm/session_api.html#sqlalchemy.orm.Session.execute
     https://docs.sqlalchemy.org/en/21/orm/queryguide/dml.html#orm-bulk-insert-statements
@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 
 def mark_batch_processing(session_factory: sessionmaker[Session], batch: BatchMessage) -> bool:
-    """upsert the ingest batch that is processing"""
+    """Upsert the batch's ingest_batches row as PROCESSING with started_at now, clearing an earlier failure, and commit.
+    Returns False without writing if the batch is already persisted (persisted_at set), True otherwise."""
     with session_factory.begin() as session:
         # check the batch is not persisted
         # (edge case: worker died right after write to db and before ack -> task requeued)
@@ -50,10 +51,11 @@ def record_invalid_batch(
     batch_id: str,
     tenant_id: str,
     received_at: str,
-    event_count: str,
+    event_count: int,
     error_msg: str,
 ) -> None:
-    """insert the ingest batch that failed the validation"""
+    """Insert a FAILED ingest_batches row for a message that failed validation, from its raw values, and commit.
+    The database parses the ids and received_at; raises IntegrityError or DataError if it rejects them."""
     with session_factory.begin() as session:
         insert_stmt = insert(IngestBatch).values(
             id=batch_id,
@@ -68,7 +70,7 @@ def record_invalid_batch(
 
 
 def mark_batch_failed(session_factory: sessionmaker[Session], batch: BatchMessage, error_msg: str) -> None:
-    """update the batch status to failed"""
+    """Set the batch's ingest_batches row to FAILED with failed_at now and the given error message, and commit."""
     with session_factory.begin() as session:
         update_stmt = (
             update(IngestBatch)
@@ -79,7 +81,7 @@ def mark_batch_failed(session_factory: sessionmaker[Session], batch: BatchMessag
 
 
 def ingest_batch_to_pg(session_factory: sessionmaker[Session], batch: BatchMessage) -> None:
-    """Insert one log_events row per entry of the batch in a single statement and transaction, then commit.
+    """Insert one log_events row per entry and set the batch's ingest_batches row to PERSISTED in one transaction.
     Rows get the batch's tenant_id and received_at (as ingested_at); events the tenant already has are skipped.
     Raises a SQLAlchemy error and writes nothing if the database rejects the batch (e.g. unknown tenant)."""
     with session_factory.begin() as session:

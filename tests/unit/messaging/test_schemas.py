@@ -46,3 +46,12 @@ def test_naive_received_at_is_rejected(fields: dict[str, Any]) -> None:
     """received_at must carry a timezone."""
     with pytest.raises(ValidationError, match="received_at"):
         BatchMessage(**(fields | {"received_at": datetime(2026, 10, 8, 4, 26)}))
+
+
+def test_validation_errors_do_not_echo_the_message_content(fields: dict[str, Any]) -> None:
+    """The error text names the failing field but not its value: log bodies must not end up in worker logs."""
+    entry = fields["log_entries"][0].model_dump(mode="json") | {"message": "card 4111 1111", "occurred_at": "soon"}
+    with pytest.raises(ValidationError, match="occurred_at") as caught:
+        BatchMessage.model_validate(fields | {"log_entries": [entry]})
+    assert "card 4111 1111" not in str(caught.value)
+    assert "soon" not in str(caught.value)

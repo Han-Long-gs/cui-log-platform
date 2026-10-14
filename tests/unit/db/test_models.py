@@ -510,15 +510,60 @@ async def test_service_invalid_fk_tenant(db_session: AsyncSession):
 
 
 async def test_ingest_batch_create(db_session: AsyncSession):
-    """create a valid ingest batch record linked to an existing tenant"""
+    """create a valid ingest batch record linked to an existing tenant; it is found by its uuid id"""
     now = datetime.now(UTC)
     tenant = Tenant(id=uuid.uuid4(), name="ingest-batch-create-test", retention_days=30, created_at=now)
     db_session.add(tenant)
     await db_session.flush()
 
-    batch = IngestBatch(tenant_id=tenant.id, event_count=50, status="QUEUED", received_at=now)
+    batch = batch_id = uuid.uuid4()
+    batch = IngestBatch(id=batch_id, tenant_id=tenant.id, event_count=50, status="QUEUED", received_at=now)
     db_session.add(batch)
     await db_session.flush()
+
+    stored = await db_session.get(IngestBatch, batch_id)
+    assert stored is batch
+    assert stored.retry_count == 0
+
+
+async def test_ingest_batch_duplicate_id(db_session: AsyncSession):
+    """insert two ingest batch records sharing the same primary key id"""
+    now = datetime.now(UTC)
+    tenant = Tenant(id=uuid.uuid4(), name="ingest-batch-duplicate-id-test", retention_days=30, created_at=now)
+    db_session.add(tenant)
+    await db_session.flush()
+    shared_id = uuid.uuid4()
+
+    first_batch = IngestBatch(id=shared_id, tenant_id=tenant.id, event_count=50, status="PROCESSING", received_at=now)
+    db_session.add(first_batch)
+    await db_session.flush()
+    db_session.expunge(first_batch)
+
+    duplicate_batch = IngestBatch(
+        id=shared_id, tenant_id=tenant.id, event_count=50, status="PROCESSING", received_at=now
+    )
+    db_session.add(duplicate_batch)
+
+    with pytest.raises(IntegrityError):
+        await db_session.flush()
+
+    await db_session.rollback()
+
+
+async def test_ingest_batch_requires_an_id(db_session: AsyncSession):
+    """insert an ingest batch without an id: the database no longer generates one"""
+    now = datetime.now(UTC)
+    tenant = Tenant(id=uuid.uuid4(), name="ingest-batch-no-id-test", retention_days=30, created_at=now)
+    db_session.add(tenant)
+    await db_session.flush()
+
+    batch_without_id = IngestBatch(tenant_id=tenant.id, event_count=50, status="PROCESSING", received_at=now)
+    db_session.add(batch_without_id)
+
+    with pytest.raises(IntegrityError):
+        await db_session.flush()
+
+    await db_session.rollback()
 
 
 async def test_ingest_batch_invalid_status(db_session: AsyncSession):
@@ -529,7 +574,9 @@ async def test_ingest_batch_invalid_status(db_session: AsyncSession):
     db_session.add(tenant)
     await db_session.flush()
 
-    invalid_batch = IngestBatch(tenant_id=tenant.id, event_count=50, status="RETRYING", received_at=now)
+    invalid_batch = IngestBatch(
+        id=uuid.uuid4(), tenant_id=tenant.id, event_count=50, status="RETRYING", received_at=now
+    )
     db_session.add(invalid_batch)
 
     with pytest.raises(IntegrityError):
@@ -542,7 +589,9 @@ async def test_ingest_batch_invalid_fk_tenant(db_session: AsyncSession):
     """insert an ingest batch referencing a tenant_id that does not exist, violating the tenant
     foreign key"""
     now = datetime.now(UTC)
-    invalid_batch = IngestBatch(tenant_id=uuid.uuid4(), event_count=50, status="QUEUED", received_at=now)
+    invalid_batch = IngestBatch(
+        id=uuid.uuid4(), tenant_id=uuid.uuid4(), event_count=50, status="QUEUED", received_at=now
+    )
     db_session.add(invalid_batch)
 
     with pytest.raises(IntegrityError):

@@ -1,10 +1,11 @@
 """Fixtures for worker integration tests, which run against the real test database through the worker's engine."""
 
+import uuid
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
 
 import pytest
-from cui_db import LogEvent, Tenant
+from cui_db import IngestBatch, LogEvent, Tenant
 from cui_messaging import BatchMessage
 from sqlalchemy import event, select, text
 from sqlalchemy.orm import Session
@@ -74,3 +75,31 @@ def log_event_inserts() -> Generator[list[str]]:
     event.listen(db.engine, "before_cursor_execute", record)
     yield seen
     event.remove(db.engine, "before_cursor_execute", record)
+
+
+@pytest.fixture
+def stored_batch() -> Callable[[uuid.UUID], IngestBatch | None]:
+    """Return a function that reads one ingest_batches row by id in a fresh session (None if there is none)."""
+
+    def fetch(batch_id: uuid.UUID) -> IngestBatch | None:
+        with Session(db.engine) as session:
+            return session.get(IngestBatch, batch_id)
+
+    return fetch
+
+
+@pytest.fixture
+def fail_statement() -> Generator[Callable[[str], None]]:
+    """Return a function that makes the next statement starting with the given SQL prefix raise RuntimeError
+    instead of running, on the worker engine. Statements before it in the same transaction have already run."""
+    armed: list[str] = []
+
+    def fail_if_armed(conn: object, cursor: object, statement: str, *rest: object) -> None:
+        for prefix in armed:
+            if statement.startswith(prefix):
+                armed.remove(prefix)
+                raise RuntimeError(f"forced failure before: {prefix}")
+
+    event.listen(db.engine, "before_cursor_execute", fail_if_armed)
+    yield armed.append
+    event.remove(db.engine, "before_cursor_execute", fail_if_armed)
