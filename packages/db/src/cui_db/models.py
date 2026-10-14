@@ -99,7 +99,7 @@ class IngestBatch(Base):
         CheckConstraint("status IN ('QUEUED', 'PROCESSING', 'PERSISTED', 'FAILED')", name="ck_status_valid"),
     )
 
-    id: Mapped[int] = mapped_column(BIGINT, primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("tenants.id"))
     event_count: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String)

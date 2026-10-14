@@ -3,7 +3,7 @@
 import uuid
 
 from cui_schemas.schemas import LogEntry
-from pydantic import AwareDatetime, BaseModel
+from pydantic import AwareDatetime, BaseModel, ConfigDict
 
 
 class BatchMessage(BaseModel):
@@ -15,3 +15,5 @@ class BatchMessage(BaseModel):
     tenant_id: uuid.UUID
     received_at: AwareDatetime
     log_entries: list[LogEntry]
+
+    model_config = ConfigDict(hide_input_in_errors=True)
