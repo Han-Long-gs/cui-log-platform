@@ -283,9 +283,11 @@ def test_permanent_errors(error: Exception) -> None:
     assert not isinstance(error, tasks.TRANSIENT_ERRORS)
 
 
-def test_a_transient_write_error_is_retried(payload: dict[str, Any], service: MagicMock) -> None:
-    """The write fails once, the retry succeeds: the task ends successfully and nothing is marked FAILED."""
-    service.ingest_batch_to_pg.side_effect = [operational_error(), None]
+@pytest.mark.parametrize("error", [operational_error(), exc.TimeoutError("QueuePool limit reached")])
+def test_a_transient_write_error_is_retried(payload: dict[str, Any], service: MagicMock, error: Exception) -> None:
+    """The write fails once, the retry succeeds: the task ends successfully and nothing is marked FAILED.
+    Each transient type is run through the task itself, so the decorator and the in-body check must both know it."""
+    service.ingest_batch_to_pg.side_effect = [error, None]
     result = apply(payload)
     assert result.successful()
     assert service.ingest_batch_to_pg.call_count == 2
