@@ -4,7 +4,9 @@ ref:https://docs.sqlalchemy.org/en/21/dialects/postgresql.html#postgresql-insert
     https://docs.sqlalchemy.org/en/21/orm/queryguide/dml.html#orm-bulk-insert-statements
 """
 
+import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from cui_db import IngestBatch, LogEvent
 from cui_messaging import BatchMessage
@@ -12,10 +14,14 @@ from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
+logger = logging.getLogger(__name__)
 
-def mark_batch_processing(session_factory: sessionmaker[Session], batch: BatchMessage) -> bool:
-    """Upsert the batch's ingest_batches row as PROCESSING with started_at now, clearing an earlier failure, and commit.
-    Returns False without writing if the batch is already persisted (persisted_at set), True otherwise."""
+
+def mark_batch_processing(session_factory: sessionmaker[Session], batch: BatchMessage, retry_count: int) -> bool:
+    """Upsert the batch's ingest_batches row as PROCESSING with started_at now and the given retry_count, clearing an
+    earlier failure, and commit. retry_count is assigned, so a redelivered message writes the same value.
+    Returns False without writing if the batch is already persisted (persisted_at set), True otherwise.
+    Raises a SQLAlchemy error if the write fails (e.g. database unreachable, unknown tenant)."""
     with session_factory.begin() as session:
         # check the batch is not persisted
         # (edge case: worker died right after write to db and before ack -> task requeued)
@@ -31,6 +37,7 @@ def mark_batch_processing(session_factory: sessionmaker[Session], batch: BatchMe
             received_at=batch.received_at,
             started_at=datetime.now(UTC),
             failed_at=None,
+            retry_count=retry_count,
             error_message=None,
         )
         upsert_stmt = insert_stmt.on_conflict_do_update(
@@ -40,13 +47,30 @@ def mark_batch_processing(session_factory: sessionmaker[Session], batch: BatchMe
                 "started_at": insert_stmt.excluded.started_at,
                 "failed_at": insert_stmt.excluded.failed_at,
                 "error_message": insert_stmt.excluded.error_message,
+                "retry_count": insert_stmt.excluded.retry_count,
             },
         )
         session.execute(upsert_stmt)
     return True
 
 
-def record_invalid_batch(
+def handle_invalid_batch(session_factory: sessionmaker[Session], batch_message: dict[str, Any]) -> None:
+    """Record a message that failed validation: if its raw batch_id, tenant_id and received_at are present, insert a
+    FAILED ingest_batches row (event_count is the length of log_entries, 0 if it is not a list). Never raises."""
+    batch_id = batch_message.get("batch_id")
+    tenant_id = batch_message.get("tenant_id")
+    received_at = batch_message.get("received_at")
+    log_entries = batch_message.get("log_entries")
+    required_fields_present = batch_id and tenant_id and received_at
+
+    if required_fields_present:
+        event_count = 0
+        if isinstance(log_entries, list):
+            event_count = len(log_entries)
+        _record_invalid_batch(session_factory, batch_id, tenant_id, received_at, event_count, "ValidationError")
+
+
+def _record_invalid_batch(
     session_factory: sessionmaker[Session],
     batch_id: str,
     tenant_id: str,
@@ -55,29 +79,38 @@ def record_invalid_batch(
     error_msg: str,
 ) -> None:
     """Insert a FAILED ingest_batches row for a message that failed validation, from its raw values, and commit.
-    The database parses the ids and received_at; raises IntegrityError or DataError if it rejects them."""
-    with session_factory.begin() as session:
-        insert_stmt = insert(IngestBatch).values(
-            id=batch_id,
-            tenant_id=tenant_id,
-            event_count=event_count,
-            status="FAILED",
-            received_at=received_at,
-            failed_at=datetime.now(UTC),
-            error_message=error_msg,
-        )
-        session.execute(insert_stmt)
+    The database parses the ids and received_at. Never raises: if the database rejects the values or cannot be
+    reached, logs the (unvalidated, so repr'd and truncated) batch_id instead."""
+    try:
+        with session_factory.begin() as session:
+            insert_stmt = insert(IngestBatch).values(
+                id=batch_id,
+                tenant_id=tenant_id,
+                event_count=event_count,
+                status="FAILED",
+                received_at=received_at,
+                failed_at=datetime.now(UTC),
+                error_message=error_msg,
+            )
+            session.execute(insert_stmt)
+    except Exception:
+        logger.error("failed to record invalid ingest batch %.40r", batch_id)
 
 
 def mark_batch_failed(session_factory: sessionmaker[Session], batch: BatchMessage, error_msg: str) -> None:
-    """Set the batch's ingest_batches row to FAILED with failed_at now and the given error message, and commit."""
-    with session_factory.begin() as session:
-        update_stmt = (
-            update(IngestBatch)
-            .where(IngestBatch.id == batch.batch_id)
-            .values(status="FAILED", failed_at=datetime.now(UTC), error_message=error_msg)
-        )
-        session.execute(update_stmt)
+    """Set the batch's ingest_batches row to FAILED with failed_at now and the given error message, and commit.
+    Updates nothing if the row does not exist. Never raises: a failed write is only logged, so it cannot hide the
+    error that made the batch fail."""
+    try:
+        with session_factory.begin() as session:
+            update_stmt = (
+                update(IngestBatch)
+                .where(IngestBatch.id == batch.batch_id)
+                .values(status="FAILED", failed_at=datetime.now(UTC), error_message=error_msg)
+            )
+            session.execute(update_stmt)
+    except Exception:
+        logger.error("failed to mark ingest batch %s as FAILED", batch.batch_id)
 
 
 def ingest_batch_to_pg(session_factory: sessionmaker[Session], batch: BatchMessage) -> None:
