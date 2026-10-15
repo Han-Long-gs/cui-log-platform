@@ -1,7 +1,9 @@
 """worker.tasks: the ingest_batch task is registered under the agreed name, takes what the API publishes, validates it
-again and drives the batch through the service functions: mark PROCESSING, write, mark FAILED on error; skip a batch
-that is already persisted; record a FAILED row for an invalid message when its ids are present. Nothing here needs a
-broker or a database: the four worker.service functions are mocks (their own tests are in tests/integration/worker)."""
+again and drives the batch through the service functions: mark PROCESSING with the retry count, write; retry a
+transient error with backoff, mark FAILED on a permanent one or when the retries run out; skip a batch that is already
+persisted; hand an invalid message to handle_invalid_batch. Nothing here needs a broker or a database: the four
+worker.service functions are mocks (their own tests are in tests/integration/worker). Retries are run with
+Task.apply(), which executes them eagerly in this process and ignores the countdown."""
 
 import importlib
 import json
@@ -12,9 +14,12 @@ from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
 from celery import Celery
+from celery.exceptions import Retry
+from celery.result import EagerResult
 from cui_config import settings
 from cui_messaging import INGEST_BATCH_ARG_NAME, INGEST_BATCH_TASK_NAME, BatchMessage, send_batch_msg
 from pydantic import ValidationError
+from sqlalchemy import exc
 from worker import service as worker_service
 from worker import tasks
 
@@ -27,7 +32,7 @@ def payload(make_batch: Callable[..., BatchMessage]) -> dict[str, Any]:
     return make_batch(entries=3).model_dump(mode="json")
 
 
-SERVICE_FUNCTIONS = ["mark_batch_processing", "ingest_batch_to_pg", "mark_batch_failed", "record_invalid_batch"]
+SERVICE_FUNCTIONS = ["mark_batch_processing", "ingest_batch_to_pg", "mark_batch_failed", "handle_invalid_batch"]
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +51,21 @@ def service(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 def run(payload: dict[str, Any]) -> None:
     """Call the task the way Celery does, with the message under the agreed keyword."""
     tasks.ingest_batch(**{INGEST_BATCH_ARG_NAME: payload})
+
+
+def apply(payload: dict[str, Any], retries: int = 0) -> EagerResult:
+    """Run the task inside a Celery request whose retry count is `retries`; a retry runs again at once, in-process."""
+    return tasks.ingest_batch.apply(kwargs={INGEST_BATCH_ARG_NAME: payload}, retries=retries)
+
+
+def operational_error() -> exc.OperationalError:
+    """What SQLAlchemy raises when Postgres cannot be reached or drops the connection."""
+    return exc.OperationalError("INSERT INTO log_events ...", {}, Exception("server closed the connection"))
+
+
+def integrity_error() -> exc.IntegrityError:
+    """What SQLAlchemy raises when a constraint rejects the row, e.g. an unknown tenant."""
+    return exc.IntegrityError("INSERT INTO ingest_batches ...", {}, Exception("foreign key violation"))
 
 
 @pytest.fixture
@@ -106,7 +126,7 @@ def test_task_marks_the_batch_processing_then_writes_it(payload: dict[str, Any],
     run(payload)
     batch = BatchMessage.model_validate(payload)
     assert service.mock_calls == [
-        call.mark_batch_processing(tasks.session_factory, batch),
+        call.mark_batch_processing(tasks.session_factory, batch, 0),
         call.ingest_batch_to_pg(tasks.session_factory, batch),
     ]
 
@@ -130,12 +150,23 @@ def test_task_logs_the_skipped_batch(
 
 
 def test_task_does_not_write_when_marking_processing_fails(payload: dict[str, Any], service: MagicMock) -> None:
-    """If the first step cannot reach the database there is no row to mark FAILED: the error goes straight out."""
-    service.mark_batch_processing.side_effect = ConnectionError("database is down")
-    with pytest.raises(ConnectionError):
+    """A permanent error in the first step stops the task before the write, and the task fails with it."""
+    service.mark_batch_processing.side_effect = integrity_error()
+    with pytest.raises(exc.IntegrityError):
         run(payload)
     service.ingest_batch_to_pg.assert_not_called()
-    service.mark_batch_failed.assert_not_called()
+
+
+def test_a_permanent_error_marking_processing_marks_the_batch_failed(
+    payload: dict[str, Any], service: MagicMock
+) -> None:
+    """The same give-up path as a failed write; if the row was never written, the update simply finds nothing."""
+    service.mark_batch_processing.side_effect = integrity_error()
+    with pytest.raises(exc.IntegrityError):
+        run(payload)
+    service.mark_batch_failed.assert_called_once_with(
+        tasks.session_factory, BatchMessage.model_validate(payload), "IntegrityError"
+    )
 
 
 # --- ingest_batch: the write fails ---
@@ -170,27 +201,16 @@ def test_a_failed_write_is_logged_without_the_error_text(
     assert "card 4111 1111" not in caplog.text
 
 
-def test_the_write_error_survives_a_failure_to_mark_the_batch_failed(
-    payload: dict[str, Any], service: MagicMock, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Marking FAILED usually fails for the same reason the write did; the task still reports the write's error."""
-    service.ingest_batch_to_pg.side_effect = RuntimeError("write failed")
-    service.mark_batch_failed.side_effect = ConnectionError("database is down")
-    with caplog.at_level(logging.INFO, logger=tasks.logger.name), pytest.raises(RuntimeError, match="write failed"):
-        run(payload)
-    assert f"failed to mark ingest batch {payload['batch_id']} as FAILED" in caplog.text
-
-
 # --- ingest_batch: an invalid message ---
 
 
 @pytest.mark.parametrize("field", ["batch_id", "tenant_id", "received_at"])
 def test_task_rejects_a_message_missing_an_id_field(payload: dict[str, Any], service: MagicMock, field: str) -> None:
-    """Without all three fields the worker validates, fails and writes nothing at all."""
+    """Without all three fields validation fails; only handle_invalid_batch runs (it finds nothing to write)."""
     del payload[field]
     with pytest.raises(ValidationError, match=field):
         run(payload)
-    assert service.mock_calls == []
+    assert service.mock_calls == [call.handle_invalid_batch(tasks.session_factory, payload)]
 
 
 def test_task_rejects_a_message_with_an_invalid_entry(payload: dict[str, Any], service: MagicMock) -> None:
@@ -202,40 +222,12 @@ def test_task_rejects_a_message_with_an_invalid_entry(payload: dict[str, Any], s
     service.ingest_batch_to_pg.assert_not_called()
 
 
-def test_an_invalid_message_with_its_ids_is_recorded_as_failed(payload: dict[str, Any], service: MagicMock) -> None:
-    """The raw ids, received_at and entry count go to record_invalid_batch, with the error type as the reason."""
+def test_an_invalid_message_goes_to_handle_invalid_batch(payload: dict[str, Any], service: MagicMock) -> None:
+    """The raw message, unchanged, is what handle_invalid_batch reads the ids from."""
     payload["log_entries"][1]["level"] = "verbose"
     with pytest.raises(ValidationError):
         run(payload)
-    service.record_invalid_batch.assert_called_once_with(
-        tasks.session_factory,
-        payload["batch_id"],
-        payload["tenant_id"],
-        payload["received_at"],
-        3,
-        "ValidationError",
-    )
-
-
-def test_an_invalid_message_whose_entries_are_not_a_list_has_0_events(
-    payload: dict[str, Any], service: MagicMock
-) -> None:
-    """event_count falls back to 0 when log_entries cannot be counted."""
-    payload["log_entries"] = "not a list"
-    with pytest.raises(ValidationError):
-        run(payload)
-    assert service.record_invalid_batch.call_args.args[4] == 0
-
-
-def test_the_validation_error_survives_a_failure_to_record_the_batch(
-    payload: dict[str, Any], service: MagicMock, caplog: pytest.LogCaptureFixture
-) -> None:
-    """If the FAILED row cannot be written (e.g. unknown tenant) the task still fails with the ValidationError."""
-    payload["log_entries"][1]["level"] = "verbose"
-    service.record_invalid_batch.side_effect = ConnectionError("foreign key violation")
-    with caplog.at_level(logging.INFO, logger=tasks.logger.name), pytest.raises(ValidationError):
-        run(payload)
-    assert f"failed to record invalid ingest batch {payload['batch_id']}" in caplog.text
+    service.handle_invalid_batch.assert_called_once_with(tasks.session_factory, payload)
 
 
 def test_an_invalid_message_is_logged_without_its_content(
@@ -247,3 +239,139 @@ def test_an_invalid_message_is_logged_without_its_content(
         run(payload)
     assert "failed to validate the batch message" in caplog.text
     assert "card 4111 1111" not in caplog.text
+
+
+# --- ingest_batch: retries ---
+
+
+def test_retry_settings_match_the_decision() -> None:
+    """docs/decisions.md: retry OperationalError and pool TimeoutError only, at most 10 times, backoff 1 s doubling up
+    to 10 s with full jitter."""
+    task = tasks.ingest_batch
+    assert task.autoretry_for == tasks.TRANSIENT_ERRORS
+    assert task.max_retries == tasks.MAX_RETRIES == 10
+    assert task.retry_backoff is True
+    assert task.retry_backoff_max == tasks.MAX_BACKOFF == 10
+    assert task.retry_jitter is True
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        exc.OperationalError("SELECT 1", {}, Exception("connection refused")),
+        exc.TimeoutError("QueuePool limit reached"),
+    ],
+)
+def test_transient_errors(error: Exception) -> None:
+    """Postgres unreachable / connection dropped, and no free connection in the pool."""
+    assert isinstance(error, tasks.TRANSIENT_ERRORS)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        exc.IntegrityError("INSERT", {}, Exception("foreign key violation")),
+        exc.DataError("INSERT", {}, Exception("invalid input syntax for type uuid")),
+        exc.ProgrammingError("INSERT", {}, Exception("relation does not exist")),
+        exc.InterfaceError("INSERT", {}, Exception("the cursor is closed")),
+        KeyError("batch_id"),
+        RuntimeError("bug"),
+    ],
+)
+def test_permanent_errors(error: Exception) -> None:
+    """Retrying the same batch would fail the same way: rejected data, a wrong query, a misused driver, a bug."""
+    assert not isinstance(error, tasks.TRANSIENT_ERRORS)
+
+
+def test_a_transient_write_error_is_retried(payload: dict[str, Any], service: MagicMock) -> None:
+    """The write fails once, the retry succeeds: the task ends successfully and nothing is marked FAILED."""
+    service.ingest_batch_to_pg.side_effect = [operational_error(), None]
+    result = apply(payload)
+    assert result.successful()
+    assert service.ingest_batch_to_pg.call_count == 2
+    service.mark_batch_failed.assert_not_called()
+
+
+def test_a_transient_error_marking_processing_is_retried(payload: dict[str, Any], service: MagicMock) -> None:
+    """Postgres being down shows up first in mark_batch_processing; that step is retried too."""
+    service.mark_batch_processing.side_effect = [operational_error(), True]
+    result = apply(payload)
+    assert result.successful()
+    service.ingest_batch_to_pg.assert_called_once()
+
+
+def test_each_attempt_marks_processing_with_its_retry_count(payload: dict[str, Any], service: MagicMock) -> None:
+    """retry_count comes from the request: 0 on the first run, 1 and 2 on the retries."""
+    service.ingest_batch_to_pg.side_effect = [operational_error(), operational_error(), None]
+    apply(payload)
+    batch = BatchMessage.model_validate(payload)
+    assert service.mark_batch_processing.call_args_list == [
+        call(tasks.session_factory, batch, 0),
+        call(tasks.session_factory, batch, 1),
+        call(tasks.session_factory, batch, 2),
+    ]
+
+
+def test_a_transient_error_is_not_marked_failed_while_retries_remain(
+    payload: dict[str, Any], service: MagicMock
+) -> None:
+    """Waiting for a retry is still PROCESSING (decision 2B)."""
+    service.ingest_batch_to_pg.side_effect = [operational_error(), None]
+    apply(payload, retries=tasks.MAX_RETRIES - 1)
+    service.mark_batch_failed.assert_not_called()
+
+
+def test_a_transient_error_on_the_last_retry_marks_the_batch_failed(
+    payload: dict[str, Any], service: MagicMock
+) -> None:
+    """With the retries used up the batch is given up on: FAILED with the error type, and the task fails with it."""
+    service.ingest_batch_to_pg.side_effect = operational_error()
+    result = apply(payload, retries=tasks.MAX_RETRIES)
+    assert result.failed()
+    assert isinstance(result.result, exc.OperationalError)
+    service.mark_batch_failed.assert_called_once_with(
+        tasks.session_factory, BatchMessage.model_validate(payload), "OperationalError"
+    )
+
+
+def test_a_batch_that_keeps_failing_runs_max_retries_plus_one_times(
+    payload: dict[str, Any], service: MagicMock
+) -> None:
+    """The first run and 10 retries; then it stops."""
+    service.ingest_batch_to_pg.side_effect = operational_error()
+    result = apply(payload)
+    assert result.failed()
+    assert service.ingest_batch_to_pg.call_count == tasks.MAX_RETRIES + 1
+    service.mark_batch_failed.assert_called_once()
+
+
+def test_a_permanent_error_is_not_retried(payload: dict[str, Any], service: MagicMock) -> None:
+    """One attempt, FAILED, and the task fails with the original error."""
+    service.ingest_batch_to_pg.side_effect = integrity_error()
+    result = apply(payload)
+    assert result.failed()
+    assert isinstance(result.result, exc.IntegrityError)
+    service.ingest_batch_to_pg.assert_called_once()
+    service.mark_batch_failed.assert_called_once()
+
+
+def test_an_invalid_message_is_not_retried(payload: dict[str, Any], service: MagicMock) -> None:
+    """Validation fails the same way every time."""
+    payload["log_entries"][0]["level"] = "verbose"
+    result = apply(payload)
+    assert result.failed()
+    assert isinstance(result.result, ValidationError)
+    service.handle_invalid_batch.assert_called_once()
+
+
+@pytest.mark.parametrize(("retries", "ceiling"), [(0, 1), (1, 2), (3, 8), (4, 10), (9, 10)])
+def test_the_retry_delay_doubles_up_to_the_cap(
+    payload: dict[str, Any], service: MagicMock, monkeypatch: pytest.MonkeyPatch, retries: int, ceiling: int
+) -> None:
+    """countdown is drawn from 0..min(10, 2**retries) (full jitter), and the retry carries the original error."""
+    service.ingest_batch_to_pg.side_effect = operational_error()
+    retry = MagicMock(side_effect=Retry())
+    monkeypatch.setattr(tasks.ingest_batch, "retry", retry)
+    apply(payload, retries=retries)
+    assert 0 <= retry.call_args.kwargs["countdown"] <= ceiling
+    assert isinstance(retry.call_args.kwargs["exc"], exc.OperationalError)

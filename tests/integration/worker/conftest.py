@@ -89,17 +89,21 @@ def stored_batch() -> Callable[[uuid.UUID], IngestBatch | None]:
 
 
 @pytest.fixture
-def fail_statement() -> Generator[Callable[[str], None]]:
-    """Return a function that makes the next statement starting with the given SQL prefix raise RuntimeError
-    instead of running, on the worker engine. Statements before it in the same transaction have already run."""
-    armed: list[str] = []
+def fail_statement() -> Generator[Callable[..., None]]:
+    """Return a function that makes the next statement starting with the given SQL prefix raise `error` (default a
+    RuntimeError) instead of running, on the worker engine. Arm it n times to fail the next n such statements.
+    Statements before it in the same transaction have already run."""
+    armed: list[tuple[str, Exception | None]] = []
+
+    def arm(prefix: str, error: Exception | None = None) -> None:
+        armed.append((prefix, error))
 
     def fail_if_armed(conn: object, cursor: object, statement: str, *rest: object) -> None:
-        for prefix in armed:
+        for prefix, error in armed:
             if statement.startswith(prefix):
-                armed.remove(prefix)
-                raise RuntimeError(f"forced failure before: {prefix}")
+                armed.remove((prefix, error))
+                raise error or RuntimeError(f"forced failure before: {prefix}")
 
     event.listen(db.engine, "before_cursor_execute", fail_if_armed)
-    yield armed.append
+    yield arm
     event.remove(db.engine, "before_cursor_execute", fail_if_armed)
