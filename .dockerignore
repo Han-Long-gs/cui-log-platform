@@ -1,0 +1,26 @@
+# secrets
+.env*
+
+# local environments / VCS
+.venv
+.git
+.github
+
+# caches and reports
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# not needed to build or run the services
+docs
+tests
+loadtests
+todo.md
+CLAUDE.md
+.claude
+.agents
+.vscode
+.idea
