@@ -1,5 +1,6 @@
 # ref: https://docs.docker.com/compose/gettingstarted/
 #     https://docs.docker.com/reference/compose-file/services/#healthcheck
+#     https://stackoverflow.com/questions/41330514/docker-rabbitmq-persistency # for rabbitmq data persistency...
 services:
   ingestion-api:
     environment:
@@ -52,8 +53,11 @@ services:
       retries: 3
       start_period: 30s
       start_interval: 1s
+    volumes:
+      - pg-data:/var/lib/postgresql
 
   rabbitmq:
+    hostname: myrabbit
     image: rabbitmq:4.2.9-management
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
@@ -67,6 +71,8 @@ services:
       retries: 3
       start_period: 30s
       start_interval: 1s
+    volumes:
+      - mq-data:/var/lib/rabbitmq
 
   # for db migration only, see how profiles work here: https://docs.docker.com/reference/compose-file/profiles/
   migrate:
@@ -81,3 +87,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+volumes:
+  pg-data:
+  mq-data:
