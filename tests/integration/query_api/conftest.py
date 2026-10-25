@@ -14,7 +14,7 @@ import pytest
 from cui_db import DEV_TENANT_ID, LogEvent, Tenant
 from query_api import db
 from query_api.constants import DEFAULT_LIMIT
-from query_api.service import LogPage, decode_cursor, fetch_log_events
+from query_api.service import LogPage, count_log_events_by_level, decode_cursor, fetch_log_events
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -168,3 +168,24 @@ def pages() -> Callable[..., list[list[str]]]:
         pytest.fail(f"still a next_cursor after {MAX_PAGES} pages: {result}")
 
     return walk
+
+
+# count_log_events_by_level has no defaults either.
+NO_COUNT_FILTERS: dict[str, Any] = {
+    "service_name": None,
+    "environment": None,
+    "start": None,
+    "end": None,
+}
+
+
+@pytest.fixture
+def count() -> Callable[..., dict[str, int]]:
+    """count(tenant_id=dev tenant, **overrides): count_log_events_by_level on a real session with every argument
+    passed explicitly; arguments not given are NO_COUNT_FILTERS."""
+
+    def count_levels(tenant_id: uuid.UUID = DEV_TENANT_ID, **overrides: Any) -> dict[str, int]:
+        with Session(db.engine) as session:
+            return count_log_events_by_level(session, tenant_id, **(NO_COUNT_FILTERS | overrides))
+
+    return count_levels

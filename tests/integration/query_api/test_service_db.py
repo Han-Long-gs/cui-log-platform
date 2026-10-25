@@ -1,12 +1,14 @@
-"""fetch_log_events against the real database and the known data set in conftest.py (e1–e8 dev tenant,
-other-* second tenant).
+"""fetch_log_events and count_log_events_by_level against the real database and the known data set in conftest.py
+(e1–e8 dev tenant, other-* second tenant).
 
 Covers what only real SQL can show: unset filters really are left out (a `== None` would return nothing), ordering
 including ties, the [start, end) bounds, limit, keyset pagination (no row repeated or skipped across pages, also when
-a page ends inside a tie) and that another tenant's rows never come back, on any page.
+a page ends inside a tie) and that another tenant's rows never come back, on any page. For the counts: every level
+has a key even without events, the filters and bounds match fetch_log_events, and the counts agree with the rows.
 """
 
 import uuid
+from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta, timezone
 
@@ -14,7 +16,7 @@ import pytest
 from cui_db import DEV_TENANT_ID, LogEvent
 from query_api import db
 from query_api.constants import DEFAULT_LIMIT
-from query_api.service import LogPage, fetch_log_events
+from query_api.service import LogPage, count_log_events_by_level, fetch_log_events
 from sqlalchemy.orm import Session
 
 ALL_DEV_NEWEST_FIRST = ["e8", "e7", "e6", "e5", "e4", "e3", "e2", "e1"]
@@ -250,3 +252,89 @@ def test_cursor_in_another_offset_is_compared_as_an_instant(messages: Callable[.
     """20:00+08:00 is 12:00Z; with id 0 nothing at 12:00 is left, only older rows."""
     plus_eight = timezone(timedelta(hours=8))
     assert messages(cursor=(datetime(2026, 10, 1, 20, tzinfo=plus_eight), 0)) == ["e3", "e2", "e1"]
+
+
+# ---------- count_log_events_by_level ----------
+
+
+def levels(**nonzero: int) -> dict[str, int]:
+    """The expected counts: every level present, 0 unless given."""
+    return {"DEBUG": 0, "INFO": 0, "WARNING": 0, "ERROR": 0, "CRITICAL": 0} | nonzero
+
+
+def test_count_every_argument_is_required() -> None:
+    """Like fetch_log_events: no defaults in the service, so a forgotten filter fails loudly."""
+    with Session(db.engine) as session, pytest.raises(TypeError):
+        count_log_events_by_level(session, DEV_TENANT_ID)
+
+
+def test_count_without_filters_counts_every_level_of_the_tenant(count: Callable[..., dict[str, int]]) -> None:
+    """e1, e3, e4, e8 are ERROR; e2, e5, e6, e7 are one each of INFO, WARNING, DEBUG, CRITICAL."""
+    assert count() == levels(ERROR=4, INFO=1, WARNING=1, DEBUG=1, CRITICAL=1)
+
+
+def test_count_has_a_zero_for_levels_without_events(count: Callable[..., dict[str, int]]) -> None:
+    """worker / dev only has e6 (DEBUG); the other four levels are still in the result, as 0."""
+    assert count(service_name="worker", environment="dev") == levels(DEBUG=1)
+
+
+def test_count_filter_by_service_name(count: Callable[..., dict[str, int]]) -> None:
+    """api: e1, e3, e8 (ERROR), e2 (INFO), e7 (CRITICAL)."""
+    assert count(service_name="api") == levels(ERROR=3, INFO=1, CRITICAL=1)
+
+
+def test_count_filter_by_environment(count: Callable[..., dict[str, int]]) -> None:
+    """dev: e3 (ERROR), e6 (DEBUG)."""
+    assert count(environment="dev") == levels(ERROR=1, DEBUG=1)
+
+
+def test_count_filters_are_combined_with_and(count: Callable[..., dict[str, int]]) -> None:
+    """worker AND prod: e4 (ERROR), e5 (WARNING)."""
+    assert count(service_name="worker", environment="prod") == levels(ERROR=1, WARNING=1)
+
+
+def test_count_start_is_inclusive_and_end_is_exclusive(
+    count: Callable[..., dict[str, int]], at: Callable[..., datetime]
+) -> None:
+    """[12:00, 14:00): e4, e5 at 12:00 are in, e6 at 13:00 is in, e7 at 14:00 is out."""
+    assert count(start=at(12), end=at(14)) == levels(ERROR=1, WARNING=1, DEBUG=1)
+
+
+def test_count_adjacent_windows_add_up_to_the_whole(
+    count: Callable[..., dict[str, int]], at: Callable[..., datetime]
+) -> None:
+    """Splitting at 12:00 (where e4 and e5 sit) counts every event in exactly one half: e1-e3 before, e4-e8 after,
+    which adds up to the whole tenant (ERROR 4, one of each other level)."""
+    assert count(end=at(12)) == levels(ERROR=2, INFO=1)
+    assert count(start=at(12)) == levels(ERROR=2, WARNING=1, DEBUG=1, CRITICAL=1)
+
+
+def test_count_start_equal_to_end_is_all_zero(
+    count: Callable[..., dict[str, int]], at: Callable[..., datetime]
+) -> None:
+    """[12:00, 12:00) holds nothing, even though e4 and e5 sit exactly at 12:00."""
+    assert count(start=at(12), end=at(12)) == levels()
+
+
+def test_count_excludes_other_tenant(count: Callable[..., dict[str, int]], other_tenant_id: uuid.UUID) -> None:
+    """Each tenant counts only its own rows: the second tenant has two ERROR and one WARNING."""
+    assert count(other_tenant_id) == levels(ERROR=2, WARNING=1)
+
+
+@pytest.mark.parametrize(
+    "filters",
+    [{}, {"service_name": "api"}, {"environment": "prod"}],
+    ids=["no-filter", "service", "environment"],
+)
+def test_count_matches_the_rows_fetch_log_events_returns(
+    count: Callable[..., dict[str, int]],
+    fetch: Callable[..., LogPage],
+    at: Callable[..., datetime],
+    filters: dict[str, object],
+) -> None:
+    """The page's stats and its list use the same filters, so counting the listed rows by level gives the stats."""
+    window = {"start": at(10), "end": at(9, day=2)} | filters
+    page = fetch(**window, limit=100)
+    assert page.next_cursor is None
+    listed = Counter(event.level for event in page.items)
+    assert count(**window) == levels(**listed)

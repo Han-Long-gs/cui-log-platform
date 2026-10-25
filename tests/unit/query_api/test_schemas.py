@@ -1,6 +1,8 @@
-"""QueryParams (query parameters), LogItem (one log in the response) and QueryResponse (the response body).
+"""QueryParams (query parameters of /logs), StatsParams (query parameters of /stats), LogItem (one log in the
+response) and QueryResponse (the response body).
 
-Every boundary of the query contract is tested here, the cheapest layer; test_api_logs.py only checks what HTTP adds.
+Every boundary of the query contract is tested here, the cheapest layer; test_api_logs.py and test_api_stats.py only
+check what HTTP adds. Rules the two parameter models share (empty filters, timezones, start <= end) run against both.
 """
 
 import uuid
@@ -10,8 +12,13 @@ import pytest
 from cui_db import LogEvent
 from pydantic import ValidationError
 from query_api.constants import DEFAULT_LIMIT, MAX_LIMIT
-from query_api.schemas import LogItem, QueryParams, QueryResponse
+from query_api.schemas import LogItem, QueryParams, QueryResponse, StatsParams
 from query_api.service import encode_cursor
+
+FilterModel = type[QueryParams] | type[StatsParams]
+
+# Runs a test once per parameter model; the test id says which model failed.
+both_models = pytest.mark.parametrize("model", [QueryParams, StatsParams], ids=["QueryParams", "StatsParams"])
 
 # ---------- QueryParams: defaults ----------
 
@@ -41,10 +48,11 @@ def test_filters_are_kept_as_given() -> None:
     assert query.environment == "prod"
 
 
+@both_models
 @pytest.mark.parametrize("field", ["service_name", "environment"])
-def test_empty_filter_means_no_filter(field: str) -> None:
+def test_empty_filter_means_no_filter(model: FilterModel, field: str) -> None:
     """An empty string (e.g. a "show all" dropdown sending service_name=) is treated as not given."""
-    assert getattr(QueryParams.model_validate({field: ""}), field) is None
+    assert getattr(model.model_validate({field: ""}), field) is None
 
 
 # ---------- QueryParams: level ----------
@@ -78,11 +86,12 @@ def test_start_and_end_are_parsed_as_aware_datetimes() -> None:
     assert query.end.utcoffset() == timedelta(hours=8)
 
 
+@both_models
 @pytest.mark.parametrize("field", ["start", "end"])
-def test_naive_time_is_rejected(field: str) -> None:
+def test_naive_time_is_rejected(model: FilterModel, field: str) -> None:
     """A time without a timezone is rejected instead of guessing one."""
     with pytest.raises(ValidationError) as excinfo:
-        QueryParams.model_validate({field: "2026-10-01T12:00:00"})
+        model.model_validate({field: "2026-10-01T12:00:00"})
     assert excinfo.value.errors()[0]["loc"] == (field,)
 
 
@@ -93,19 +102,21 @@ def test_unparseable_time_is_rejected(field: str) -> None:
         QueryParams.model_validate({field: "yesterday"})
 
 
+@both_models
 @pytest.mark.parametrize("field", ["start", "end"])
 @pytest.mark.parametrize("raw", ["1700000000", "1700000000000", "1.7e9"])
-def test_numeric_time_is_rejected(field: str, raw: str) -> None:
+def test_numeric_time_is_rejected(model: FilterModel, field: str, raw: str) -> None:
     """A Unix timestamp is rejected as on the write path: its unit would be guessed and it skips the timezone check."""
     with pytest.raises(ValidationError) as excinfo:
-        QueryParams.model_validate({field: raw})
+        model.model_validate({field: raw})
     assert excinfo.value.errors()[0]["loc"] == (field,)
 
 
-def test_start_after_end_is_rejected() -> None:
+@both_models
+def test_start_after_end_is_rejected(model: FilterModel) -> None:
     """start > end is a validation error."""
     with pytest.raises(ValidationError):
-        QueryParams.model_validate({"start": "2026-10-02T00:00:00Z", "end": "2026-10-01T00:00:00Z"})
+        model.model_validate({"start": "2026-10-02T00:00:00Z", "end": "2026-10-01T00:00:00Z"})
 
 
 def test_start_after_end_is_compared_as_instants() -> None:
@@ -120,9 +131,10 @@ def test_start_before_end_in_other_offsets_is_accepted() -> None:
     assert query.start < query.end
 
 
-def test_start_equal_to_end_is_accepted() -> None:
-    """start == end is an empty [start, end) window, not an error; the service returns nothing for it."""
-    query = QueryParams.model_validate({"start": "2026-10-01T12:00:00Z", "end": "2026-10-01T12:00:00Z"})
+@both_models
+def test_start_equal_to_end_is_accepted(model: FilterModel) -> None:
+    """start == end is an empty [start, end) window, not an error; the service finds nothing in it."""
+    query = model.model_validate({"start": "2026-10-01T12:00:00Z", "end": "2026-10-01T12:00:00Z"})
     assert query.start == query.end
 
 
@@ -130,6 +142,24 @@ def test_only_start_or_only_end_is_accepted() -> None:
     """Either bound may be given alone."""
     assert QueryParams.model_validate({"start": "2026-10-01T12:00:00Z"}).end is None
     assert QueryParams.model_validate({"end": "2026-10-01T12:00:00Z"}).start is None
+
+
+# ---------- StatsParams ----------
+
+
+def test_stats_params_has_only_the_four_filters() -> None:
+    """/stats takes service_name, environment, start and end only: no level (the result is split by level) and no
+    cursor / limit (an aggregate is a single result, not a page)."""
+    assert StatsParams.model_fields.keys() == {"service_name", "environment", "start", "end"}
+
+
+def test_stats_every_filter_is_optional() -> None:
+    """No parameters at all is valid for /stats: every filter is None (count the whole tenant)."""
+    query = StatsParams.model_validate({})
+    assert query.service_name is None
+    assert query.environment is None
+    assert query.start is None
+    assert query.end is None
 
 
 # ---------- QueryParams: limit ----------

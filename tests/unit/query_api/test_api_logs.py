@@ -19,17 +19,8 @@ from query_api.service import LogPage, encode_cursor
 
 URL = "/api/v1/logs"
 
-
-def error_locs(resp: Response) -> list[list[Any]]:
-    """Assert resp is a 422 in the app's format (exact keys, unlike FastAPI's default) and return each error's loc."""
-    assert resp.status_code == 422
-    body = resp.json()
-    assert body.keys() == {"error", "detail"}
-    assert body["error"] == "Validation Error"
-    assert body["detail"], "422 response must list at least one error"
-    for entry in body["detail"]:
-        assert entry.keys() == {"loc", "msg"}
-    return [entry["loc"] for entry in body["detail"]]
+# The error_locs fixture (conftest.py).
+ErrorLocs = Callable[[Response], list[list[Any]]]
 
 
 def stored_event(**overrides: Any) -> LogEvent:
@@ -196,42 +187,46 @@ def test_unknown_params_are_ignored(client: TestClient, fetch_log_events: MagicM
 # ---------- 422 ----------
 
 
-def test_invalid_level_is_422_with_query_loc(client: TestClient, fetch_log_events: MagicMock) -> None:
+def test_invalid_level_is_422_with_query_loc(
+    client: TestClient, fetch_log_events: MagicMock, error_locs: ErrorLocs
+) -> None:
     """A bad level is reported at ["query", "level"] in the app's format, and fetch_log_events is not called."""
     resp = client.get(URL, params={"level": "verbose"})
     assert error_locs(resp) == [["query", "level"]]
     fetch_log_events.assert_not_called()
 
 
-def test_limit_out_of_range_is_422(client: TestClient, fetch_log_events: MagicMock) -> None:
+def test_limit_out_of_range_is_422(client: TestClient, fetch_log_events: MagicMock, error_locs: ErrorLocs) -> None:
     """limit=101 is reported at ["query", "limit"]."""
     resp = client.get(URL, params={"limit": "101"})
     assert error_locs(resp) == [["query", "limit"]]
     fetch_log_events.assert_not_called()
 
 
-def test_naive_start_is_422(client: TestClient, fetch_log_events: MagicMock) -> None:
+def test_naive_start_is_422(client: TestClient, fetch_log_events: MagicMock, error_locs: ErrorLocs) -> None:
     """A start without a timezone is reported at ["query", "start"]."""
     resp = client.get(URL, params={"start": "2026-10-01T12:00:00"})
     assert error_locs(resp) == [["query", "start"]]
     fetch_log_events.assert_not_called()
 
 
-def test_start_after_end_is_422(client: TestClient, fetch_log_events: MagicMock) -> None:
+def test_start_after_end_is_422(client: TestClient, fetch_log_events: MagicMock, error_locs: ErrorLocs) -> None:
     """start > end comes back in the app's 422 format."""
     resp = client.get(URL, params={"start": "2026-10-02T00:00:00Z", "end": "2026-10-01T00:00:00Z"})
     error_locs(resp)
     fetch_log_events.assert_not_called()
 
 
-def test_malformed_cursor_is_422_with_query_loc(client: TestClient, fetch_log_events: MagicMock) -> None:
+def test_malformed_cursor_is_422_with_query_loc(
+    client: TestClient, fetch_log_events: MagicMock, error_locs: ErrorLocs
+) -> None:
     """A cursor that does not decode is reported at ["query", "cursor"] (a 422, not a 500)."""
     resp = client.get(URL, params={"cursor": "not base64!!"})
     assert error_locs(resp) == [["query", "cursor"]]
     fetch_log_events.assert_not_called()
 
 
-def test_every_error_is_listed(client: TestClient, fetch_log_events: MagicMock) -> None:
+def test_every_error_is_listed(client: TestClient, fetch_log_events: MagicMock, error_locs: ErrorLocs) -> None:
     """Two bad parameters give two entries."""
     resp = client.get(URL, params={"level": "verbose", "limit": "0"})
     assert sorted(error_locs(resp)) == [["query", "level"], ["query", "limit"]]

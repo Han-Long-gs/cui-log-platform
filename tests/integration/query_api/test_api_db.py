@@ -1,4 +1,4 @@
-"""GET /api/v1/logs and /readyz end to end: HTTP → router → fetch_log_events → the real test database.
+"""GET /api/v1/logs, /api/v1/stats and /readyz end to end: HTTP → router → service → the real test database.
 
 One path through every layer; filter and boundary cases live in test_service_db.py.
 """
@@ -39,6 +39,13 @@ def test_following_next_cursor_over_http_reads_every_row_once() -> None:
             break
         params = {"limit": "3", "cursor": body["next_cursor"]}
     assert seen == [["e8", "e7", "e6"], ["e5", "e4", "e3"], ["e2", "e1"]]
+
+
+def test_stats_endpoint_reads_the_dev_tenant_from_the_database() -> None:
+    """A filtered request counts the dev tenant's rows per level, every level present."""
+    resp = TestClient(app).get("/api/v1/stats", params={"service_name": "api", "environment": "prod"})
+    assert resp.status_code == 200
+    assert resp.json() == {"counts": {"DEBUG": 0, "INFO": 1, "WARNING": 0, "ERROR": 2, "CRITICAL": 1}}
 
 
 def test_readyz_is_200_against_the_real_database() -> None:
