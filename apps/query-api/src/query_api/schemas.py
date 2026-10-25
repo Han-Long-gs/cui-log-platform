@@ -1,13 +1,23 @@
 """
 ref:https://fastapi.tiangolo.com/tutorial/query-param-models/#query-parameters-with-a-pydantic-model
+    https://pydantic.dev/docs/validation/latest/concepts/models/#dynamic-model-creation
 """
 
 import uuid
 from datetime import datetime
 from typing import Annotated
 
-from cui_schemas import validates_level, validates_timestamp, validates_timestamp_string
-from pydantic import AfterValidator, AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from cui_schemas import LEVELS, validates_level, validates_timestamp, validates_timestamp_string
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    create_model,
+    model_validator,
+)
 
 from .constants import DEFAULT_LIMIT, MAX_LIMIT
 from .service import decode_cursor
@@ -27,28 +37,25 @@ def normalize_empty_str(string: str) -> str | None:
     return string
 
 
-class QueryParams(BaseModel):
-    """Query parameters of GET /api/v1/logs.
+class StatsParams(BaseModel):
+    """Query parameters of GET /api/v1/stats; also the filter fields shared with GET /api/v1/logs.
 
-    Every field is optional. level is normalized to upper case, start / end must carry a timezone and satisfy
-    start <= end, cursor is decoded to (occurred_at, id), limit is 1..MAX_LIMIT with DEFAULT_LIMIT as default.
+    Every field is optional. An empty service_name / environment means no filter; start / end must carry a timezone
+    and satisfy start <= end.
     """
 
     service_name: Annotated[str, AfterValidator(normalize_empty_str)] | None = None
     environment: Annotated[str, AfterValidator(normalize_empty_str)] | None = None
-    level: Annotated[str, AfterValidator(validates_level)] | None = None
     start: (
         Annotated[datetime, BeforeValidator(validates_timestamp_string), AfterValidator(validates_timestamp)] | None
     ) = None
     end: (
         Annotated[datetime, BeforeValidator(validates_timestamp_string), AfterValidator(validates_timestamp)] | None
     ) = None
-    cursor: Annotated[str, AfterValidator(parse_cursor)] | None = None
-    limit: int = Field(default=DEFAULT_LIMIT, gt=0, le=MAX_LIMIT)
 
     # multi-field cross validation
     @model_validator(mode="after")
-    def check_start_le_end(self) -> QueryParams:
+    def check_start_le_end(self) -> StatsParams:
         """Raise ValueError when both bounds are given and start is later than end."""
         if self.start is None or self.end is None:
             return self
@@ -57,6 +64,28 @@ class QueryParams(BaseModel):
                 return self
             else:
                 raise ValueError("End time cannot be earlier than the start time")
+
+
+# One int field per level in LEVELS; a level missing from the input defaults to 0 and unknown keys are ignored.
+LevelCounts = create_model("LevelCounts", **{level: (int, 0) for level in LEVELS})
+
+
+class StatsResponse(BaseModel):
+    """Response body of GET /api/v1/stats: the number of matching events per level, under counts."""
+
+    counts: LevelCounts  # pyright: ignore[reportInvalidTypeForm]
+
+
+class QueryParams(StatsParams):
+    """Query parameters of GET /api/v1/logs.
+
+    Every field is optional. level is normalized to upper case, start / end must carry a timezone and satisfy
+    start <= end, cursor is decoded to (occurred_at, id), limit is 1..MAX_LIMIT with DEFAULT_LIMIT as default.
+    """
+
+    level: Annotated[str, AfterValidator(validates_level)] | None = None
+    cursor: Annotated[str, AfterValidator(parse_cursor)] | None = None
+    limit: int = Field(default=DEFAULT_LIMIT, gt=0, le=MAX_LIMIT)
 
 
 class QueryResponse(BaseModel):

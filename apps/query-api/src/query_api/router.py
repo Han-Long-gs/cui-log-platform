@@ -13,8 +13,8 @@ from sqlalchemy import exc
 from sqlalchemy.orm import Session
 
 from .db import dispose_engine, get_session, session_factory
-from .schemas import QueryParams, QueryResponse
-from .service import check_db_connection, fetch_log_events
+from .schemas import QueryParams, QueryResponse, StatsParams, StatsResponse
+from .service import check_db_connection, count_log_events_by_level, fetch_log_events
 
 
 @asynccontextmanager
@@ -67,3 +67,18 @@ def fetch_logs(params: Annotated[QueryParams, Query()], session: SessionDep) -> 
         limit=params.limit,
     )
     return QueryResponse(next_cursor=log_page.next_cursor, items=log_page.items)
+
+
+@router.get("/api/v1/stats", status_code=status.HTTP_200_OK)
+def fetch_stats(params: Annotated[StatsParams, Query()], session: SessionDep) -> StatsResponse:
+    """Return the dev tenant's event counts per level for the given filters.
+    Unknown query parameters are ignored; invalid ones are rejected with 422."""
+    level_counts = count_log_events_by_level(
+        session=session,
+        tenant_id=DEV_TENANT_ID,
+        service_name=params.service_name,
+        environment=params.environment,
+        start=params.start,
+        end=params.end,
+    )
+    return StatsResponse(counts=level_counts)

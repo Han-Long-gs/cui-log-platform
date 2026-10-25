@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from cui_db import LogEvent
-from sqlalchemy import and_, or_, select, text
+from cui_schemas import LEVELS
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import Session
 
 
@@ -102,6 +103,42 @@ def fetch_log_events(
     else:
         items = rows
     return LogPage(next_cursor=next_cursor, items=items)
+
+
+def count_log_events_by_level(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    service_name: str | None,
+    environment: str | None,
+    start: datetime | None,
+    end: datetime | None,
+) -> dict[str, int]:
+    """Count tenant_id's events matching every given filter, per level, with a key for every level in LEVELS
+    (0 when none). start is inclusive, end exclusive; filters are None (not applied) or non-empty values."""
+    # init return value
+    level_counts = {level: 0 for level in LEVELS}
+
+    # edge case: start == end, return early to save a roundtrip to db
+    if start == end and start is not None:
+        return level_counts
+
+    # build iterable to go into where()
+    where_clause = [LogEvent.tenant_id == tenant_id]
+    if service_name:
+        where_clause.append(LogEvent.service_name == service_name)
+    if environment:
+        where_clause.append(LogEvent.environment == environment)
+    if start:
+        where_clause.append(LogEvent.occurred_at >= start)
+    if end:
+        where_clause.append(LogEvent.occurred_at < end)
+
+    stmt = select(LogEvent.level, func.count(LogEvent.id)).where(*where_clause).group_by(LogEvent.level)
+    rows = session.execute(stmt).all()
+    for level, count in rows:
+        level_counts[level] = count
+    return level_counts
 
 
 def check_db_connection(session: Session) -> None:
