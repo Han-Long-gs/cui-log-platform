@@ -44,7 +44,7 @@ class QueryParams(BaseModel):
         Annotated[datetime, BeforeValidator(validates_timestamp_string), AfterValidator(validates_timestamp)] | None
     ) = None
     cursor: Annotated[str, AfterValidator(parse_cursor)] | None = None
-    limit: int | None = Field(default=DEFAULT_LIMIT, gt=0, le=MAX_LIMIT)
+    limit: int = Field(default=DEFAULT_LIMIT, gt=0, le=MAX_LIMIT)
 
     # multi-field cross validation
     @model_validator(mode="after")
