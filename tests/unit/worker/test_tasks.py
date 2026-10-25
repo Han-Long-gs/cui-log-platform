@@ -245,7 +245,7 @@ def test_an_invalid_message_is_logged_without_its_content(
 
 
 def test_retry_settings_match_the_decision() -> None:
-    """docs/decisions.md: retry OperationalError and pool TimeoutError only, at most 10 times, backoff 1 s doubling up
+    """Retry OperationalError and pool TimeoutError only, at most 10 times, backoff 1 s doubling up
     to 10 s with full jitter."""
     task = tasks.ingest_batch
     assert task.autoretry_for == tasks.TRANSIENT_ERRORS
