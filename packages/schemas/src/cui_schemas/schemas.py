@@ -16,25 +16,25 @@ def _is_number_str(string: str) -> bool:
         return False
 
 
-def _validates_timestamp_string(value: Any) -> str:
+def validates_timestamp_string(value: Any) -> str:
     """Reject non-string and numeric-string timestamps; pass other strings on to datetime parsing."""
     if not isinstance(value, str) or _is_number_str(value):
         raise ValueError(
-            "occurred_at must be an ISO 8601 string with a timezone, "
+            "timestamp must be an ISO 8601 string with a timezone, "
             "e.g. '2026-09-30T10:00:00Z' or '2026-09-30T10:00:00-07:00'; "
             f"got {value!r}"
         )
     return value
 
 
-def _validates_timestamp(timestamp: datetime) -> datetime:
+def validates_timestamp(timestamp: datetime) -> datetime:
     """Return the timestamp unchanged; raise ValueError if it has no timezone."""
     if timestamp.tzinfo is None:
         raise ValueError("Timezone was unset. Please set the timezone for the timestamp.")
     return timestamp
 
 
-def _validates_level(level: str) -> str:
+def validates_level(level: str) -> str:
     """Strip and upper-case the level; raise ValueError unless the result is one of LEVELS."""
     normalized_level = level.strip().upper()
     if normalized_level not in LEVELS:
@@ -51,8 +51,8 @@ class LogEntry(BaseModel):
     event_id: uuid.UUID
     service_name: str
     environment: str
-    level: Annotated[str, AfterValidator(_validates_level)]
+    level: Annotated[str, AfterValidator(validates_level)]
     message: str
-    occurred_at: Annotated[datetime, BeforeValidator(_validates_timestamp_string), AfterValidator(_validates_timestamp)]
+    occurred_at: Annotated[datetime, BeforeValidator(validates_timestamp_string), AfterValidator(validates_timestamp)]
     trace_id: uuid.UUID | None = None
     custom: dict[str, Any] | None = None
