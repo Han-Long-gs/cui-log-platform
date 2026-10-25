@@ -41,6 +41,12 @@ def test_filters_are_kept_as_given() -> None:
     assert query.environment == "prod"
 
 
+@pytest.mark.parametrize("field", ["service_name", "environment"])
+def test_empty_filter_means_no_filter(field: str) -> None:
+    """An empty string (e.g. a "show all" dropdown sending service_name=) is treated as not given."""
+    assert getattr(QueryParams.model_validate({field: ""}), field) is None
+
+
 # ---------- QueryParams: level ----------
 
 

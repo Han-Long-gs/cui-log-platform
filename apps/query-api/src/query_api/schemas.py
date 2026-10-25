@@ -20,6 +20,13 @@ def parse_cursor(cursor_str: str) -> tuple[datetime, int] | None:
     return decode_cursor(cursor_str)
 
 
+def normalize_empty_str(string: str) -> str | None:
+    """Return None for empty string"""
+    if string == "":
+        return None
+    return string
+
+
 class QueryParams(BaseModel):
     """Query parameters of GET /api/v1/logs.
 
@@ -27,8 +34,8 @@ class QueryParams(BaseModel):
     start <= end, cursor is decoded to (occurred_at, id), limit is 1..MAX_LIMIT with DEFAULT_LIMIT as default.
     """
 
-    service_name: str | None = None
-    environment: str | None = None
+    service_name: Annotated[str, AfterValidator(normalize_empty_str)] | None = None
+    environment: Annotated[str, AfterValidator(normalize_empty_str)] | None = None
     level: Annotated[str, AfterValidator(validates_level)] | None = None
     start: (
         Annotated[datetime, BeforeValidator(validates_timestamp_string), AfterValidator(validates_timestamp)] | None

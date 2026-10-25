@@ -56,8 +56,8 @@ def fetch_log_events(
     cursor: tuple[datetime, int] | None,
     limit: int,
 ) -> LogPage:
-    """Return at most limit events of tenant_id matching every non-None filter, ordered by (occurred_at, id) DESC.
-    start is inclusive, end exclusive; cursor returns only rows strictly after that position in this order.
+    """Return at most limit events of tenant_id, ordered by (occurred_at, id) DESC; filters are None (not applied)
+    or non-empty values. start is inclusive, end exclusive; cursor keeps only rows strictly after that position.
     next_cursor is set only when more rows follow."""
     # init return values
     next_cursor = None

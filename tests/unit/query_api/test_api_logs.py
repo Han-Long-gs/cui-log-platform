@@ -177,6 +177,17 @@ def test_empty_cursor_is_the_first_page(
     assert fetch_log_events_args()["cursor"] is None
 
 
+def test_empty_filters_reach_the_service_as_none(
+    client: TestClient, fetch_log_events_args: Callable[[], dict[str, Any]]
+) -> None:
+    """?service_name=&environment= is 200 and filters on nothing, the same as not sending them."""
+    resp = client.get(URL, params={"service_name": "", "environment": ""})
+    assert resp.status_code == 200
+    args = fetch_log_events_args()
+    assert args["service_name"] is None
+    assert args["environment"] is None
+
+
 def test_unknown_params_are_ignored(client: TestClient, fetch_log_events: MagicMock) -> None:
     """Parameters the API does not know are dropped, not rejected."""
     assert client.get(URL, params={"foo": "bar"}).status_code == 200
