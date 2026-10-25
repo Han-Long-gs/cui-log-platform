@@ -25,7 +25,7 @@ async def router_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     dispose_engine()
 
 
-router = APIRouter()
+router = APIRouter(lifespan=router_lifespan)
 
 # function scope:start the dependency before the path operation function that handles the request,
 # end the dependency after the path operation function ends,
