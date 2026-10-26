@@ -1,0 +1,86 @@
+/* base, some overrides and global css classes */
+/* ref:https://www.joshwcomeau.com/css/custom-css-reset/ */
+
+/* bunch of overrides, some from ref some from claude */
+/* Use a more-intuitive box-sizing model */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Remove default margin */
+*:not(dialog) {
+  margin: 0;
+}
+
+/* Improve media defaults */
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Avoid text overflows */
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+/* Improve line wrapping */
+p {
+  text-wrap: pretty;
+}
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+}
+
+body {
+    background-color: var(--bg);
+    font-family: var(--font-body);
+    color: var(--text);
+}
+
+/* Form control reset: drop the browser's built-in look so component classes start from a blank slate.
+   Focus outlines are not removed here; components add their own :focus-visible style. */
+button,
+input,
+select {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    padding: 0;
+}
+
+button {
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: not-allowed;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* text style class */
+.text-title {
+    font-family: var(--font-title);
+    font-size: var(--font-size-title);
+    line-height: var(--line-height-title);
+}
+
+.text-body {
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+}
+
+.text-label {
+    font-family: var(--font-label);
+    font-size: var(--font-size-label);
+    line-height: var(--line-height-label);
+    letter-spacing: var(--letter-spacing-label);
+}

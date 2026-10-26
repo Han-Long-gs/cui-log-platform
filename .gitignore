@@ -19,6 +19,7 @@ __pycache__/
 # other
 .vscode/
 loadtests/results/3.10/
+.DS_Store
 
 
 # test coverage

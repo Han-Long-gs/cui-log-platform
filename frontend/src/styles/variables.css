@@ -1,0 +1,43 @@
+/* css vars, see ui-design.md for details */
+:root {
+  /* Colors */
+  --bg: #000000;
+  --surface: #0a0047;
+  --text: #ffffff;
+  --text-muted: #9ca3af;
+  --border: #ffffff;
+  --divider: #262626;
+
+  --bg-primary-button: #00ffd2;
+  --text-primary-button: #000000;
+  --text-secondary-button: #ffffff;
+
+  --text-level-debug: #808080;
+  --text-level-info: #d4d4d4;
+  --text-level-warning: #e0af68;
+  --text-level-error: #ff4499;
+  --bg-level-critical: #ff4499;
+  --text-level-critical: #000000;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* Typography */
+  --font-title: "Monofett", "Fragment Mono", monospace;
+  --font-body: "Fragment Mono", ui-monospace, monospace;
+  --font-label: "Fragment Mono", ui-monospace, monospace;
+
+  --font-size-title: 24px;
+  --line-height-title: 32px;
+
+  --font-size-body: 13px;
+  --line-height-body: 20px;
+
+  --font-size-label: 11px;
+  --line-height-label: 16px;
+  --letter-spacing-label: 0.06em;
+}

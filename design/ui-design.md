@@ -18,7 +18,8 @@ Figma design here: https://www.figma.com/design/Sbs7VUn5VjOx06eU7gfIje/Cui?node-
 | `surface` `#0A0047`                                                    | `--surface`                                     |
 | `text` `#FFFFFF` / `text-muted` `#9CA3AF`                              | `--text` / `--text-muted`                       |
 | `border` `#FFFFFF` / `divider` `#262626`                               | `--border` / `--divider`                        |
-| `bg-button` `#00FFD2` / `text-button` `#000000`                        | `--bg-button` / `--text-button`                 |
+| `bg-primary-button` `#00FFD2` / `text-primary-button` `#000000` | `--bg-primary-button` / `--text-primary-button` |
+| `text-secondary-button` `#FFFFFF` | `--text-secondary-button` |
 | `text-level-debug` `#808080`                                           | `--text-level-debug`                            |
 | `text-level-info` `#D4D4D4`                                            | `--text-level-info`                             |
 | `text-level-warning` `#E0AF68`                                         | `--text-level-warning`                          |
@@ -26,4 +27,4 @@ Figma design here: https://www.figma.com/design/Sbs7VUn5VjOx06eU7gfIje/Cui?node-
 | `bg-level-critical` `#FF4499` / `text-level-critical` `#000000`        | `--bg-level-critical` / `--text-level-critical` |
 | `space-1` 4 / `space-2` 8 / `space-3` 12 / `space-4` 16 / `space-6` 24 | `--space-1` … `--space-6`                       |
 | Text style `title` 24/32, Monofett                                     | `--font-title`, `--font-size-title`             |
-| Text styles `body` 13/20, `label` 11/16 uppercase +6%, Fragment Mono   | `--font-body`, `--font-size-*`                  |
+| Text styles `body` 13/20, `label` 11/16 +6% letter spacing (uppercase only where needed, e.g. table header), Fragment Mono   | `--font-body`, `--font-size-*`                  |
