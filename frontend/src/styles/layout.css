@@ -1,1 +1,25 @@
 /* style for big (?) containers */
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6);
+  gap: var(--space-4);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.headerbar {
+  display: flex;
+  border-bottom: 1px solid;
+  border-color: var(--border);
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: flex-end;
+  gap: var(--space-3);
+}

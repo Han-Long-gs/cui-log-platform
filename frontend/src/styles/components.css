@@ -53,6 +53,7 @@
 
 /* distinct styles for each button */
 .btn--primary {
+  margin-left: auto;
   background-color: var(--bg-primary-button);
   color: var(--text-primary-button);
 }
@@ -73,11 +74,66 @@
 
 /* ---------select field--------- */
 
-/* TODO */
+.select-field {
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.select-field__box {
+  width: 160px;
+  height: calc(var(--line-height-body) + 2 * var(--space-2) + 2px);
+  color: var(--text);
+  border: 1px solid;
+  padding: var(--space-2) var(--space-3);
+}
 
 /* ---------log table--------- */
 
-/* TODO */
+.log-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse; /* remove the gap between cells */
+}
+
+.log-table__col--time {
+  width: 200px;
+}
+
+.log-table__col--service {
+  width: 140px;
+}
+
+.log-table__col--env {
+  width: 110px;
+}
+
+.log-table__col--level {
+  width: 120px;
+}
+
+.log-table th {
+  color: var(--text-muted);
+  background-color: var(--surface);
+  border-bottom: 1px solid;
+  border-color: var(--border);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+
+.log-table td {
+  color: var(--text);
+  border-bottom: 1px solid;
+  border-color: var(--divider);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ---------logo--------- */
 

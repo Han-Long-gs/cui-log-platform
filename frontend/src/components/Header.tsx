@@ -1,13 +1,17 @@
 // Logo
 
 type HeaderProps = {
-    logoText: string
-}
+  logoText: string;
+};
 
 const Header = (props: HeaderProps) => {
   return (
-    <a href="/" className="logo text-title">{props.logoText}</a>
-  )
-}
+    <header className="headerbar">
+      <a href="/" className="logo text-title">
+        {props.logoText}
+      </a>
+    </header>
+  );
+};
 
-export default Header
+export default Header;
