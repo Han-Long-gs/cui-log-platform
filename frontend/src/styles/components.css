@@ -96,6 +96,11 @@
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse; /* remove the gap between cells */
+  transition: opacity 150ms ease 200ms;
+}
+
+.log-table--loading {
+  opacity: 0.5;
 }
 
 .log-table__col--time {

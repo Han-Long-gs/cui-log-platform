@@ -18,13 +18,16 @@ export type LogItem = {
   custom: Record<string, unknown> | null;
 };
 
-// request shape for query-api GET /api/v1/logs
 export type LogFilters = {
   service_name?: string;
   environment?: string;
   level?: Level;
   start?: string; // ISO 8601 string with timezone
   end?: string; // ISO 8601 string with timezone
+};
+
+// request shape for query-api GET /api/v1/logs
+export type LogQuery = LogFilters & {
   cursor?: string;
   limit?: number;
 };

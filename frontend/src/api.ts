@@ -1,6 +1,7 @@
 import type {
   LogPage,
   LogFilters,
+  LogQuery,
   StatsFilters,
   StatsResponse,
 } from "./types.ts";
@@ -21,9 +22,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-function buildSearchParamsStr(filters: LogFilters | StatsFilters): string {
+function buildSearchParamsStr(
+  query: Record<string, string | number | undefined>,
+): string {
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters)) {
+  for (const [key, value] of Object.entries(query)) {
     if (value != null && value !== "") {
       params.set(key, String(value));
     }
@@ -33,8 +36,14 @@ function buildSearchParamsStr(filters: LogFilters | StatsFilters): string {
 
 export const api = {
   logs: {
-    getPage: (filters: LogFilters, signal: AbortSignal): Promise<LogPage> => {
-      return request<LogPage>(`/api/v1/logs?${buildSearchParamsStr(filters)}`, {
+    getPage: (
+      filters: LogFilters,
+      signal: AbortSignal,
+      cursor?: string,
+      limit?: number,
+    ): Promise<LogPage> => {
+      const query: LogQuery = { ...filters, cursor: cursor, limit: limit };
+      return request<LogPage>(`/api/v1/logs?${buildSearchParamsStr(query)}`, {
         method: "GET",
         signal: signal,
       });

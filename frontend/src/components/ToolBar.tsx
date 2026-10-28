@@ -1,20 +1,15 @@
 import { useState } from "react";
-import { LEVELS } from "../types.ts";
+import { LEVELS, type Level } from "../types.ts";
+import type { LogFilters } from "../types.ts";
 
 type ToolBarProps = {
   serviceList: Array<string>;
   envList: Array<string>;
-  onSearch: (draft: Draft) => void;
-};
-
-export type Draft = {
-  service: string;
-  env: string;
-  level: string;
+  onSearch: (draft: LogFilters) => void;
 };
 
 const ToolBar = (props: ToolBarProps) => {
-  const [draft, setDraft] = useState({ service: "", env: "", level: "" });
+  const [draft, setDraft] = useState<LogFilters>({});
 
   return (
     <div className="toolbar">
@@ -25,8 +20,8 @@ const ToolBar = (props: ToolBarProps) => {
           list="service-options"
           placeholder="All"
           className="text-body select-field__box"
-          value={draft.service}
-          onChange={(e) => setDraft({ ...draft, service: e.target.value })}
+          value={draft.service_name ?? ""}
+          onChange={(e) => setDraft({ ...draft, service_name: e.target.value })}
         />
         <datalist id="service-options">
           {props.serviceList.map((service: string) => (
@@ -42,8 +37,8 @@ const ToolBar = (props: ToolBarProps) => {
           list="env-options"
           placeholder="All"
           className="text-body select-field__box"
-          value={draft.env}
-          onChange={(e) => setDraft({ ...draft, env: e.target.value })}
+          value={draft.environment ?? ""}
+          onChange={(e) => setDraft({ ...draft, environment: e.target.value })}
         />
         <datalist id="env-options">
           {props.envList.map((env: string) => (
@@ -57,8 +52,10 @@ const ToolBar = (props: ToolBarProps) => {
         <select
           name="level-filter"
           className="text-body select-field__box"
-          value={draft.level}
-          onChange={(e) => setDraft({ ...draft, level: e.target.value })}
+          value={draft.level ?? ""}
+          onChange={(e) =>
+            setDraft({ ...draft, level: e.target.value as Level })
+          }
         >
           <option value="">All</option>
           {LEVELS.map((level: string) => (

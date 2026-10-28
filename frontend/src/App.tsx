@@ -1,13 +1,45 @@
 import Header from "./components/Header.tsx";
-import ToolBar, { type Draft } from "./components/ToolBar.tsx";
+import ToolBar from "./components/ToolBar.tsx";
 import LogTable from "./components/LogTable.tsx";
 import Pager from "./components/Pager.tsx";
-import { mockLogs } from "./mockLogs.ts";
-import { useState } from "react";
+import type { LogFilters, LogPage } from "./types.ts";
+import { api } from "./api.ts";
+import { useEffect, useState } from "react";
+
+const PAGE_SIZE = 20;
 
 function App() {
-  const PAGE_SIZE = 20;
-  const [page, setPage] = useState(1);
+  const [appliedFilters, setAppliedFilters] = useState<LogFilters>({}); // only stores the selected filters in ToolBar
+  const [data, setData] = useState<LogPage>({ next_cursor: null, items: [] });
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    const abortController = new AbortController();
+    api.logs
+      .getPage(
+        appliedFilters,
+        abortController.signal,
+        cursorStack.at(-1),
+        PAGE_SIZE,
+      )
+      .then((page) => {
+        setError(false);
+        setData(page);
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") {
+          return;
+        }
+        setError(true);
+      })
+      .finally(() => {
+        if (abortController.signal.aborted) return;
+        setLoading(false);
+      });
+    // clean up - avoid race condition
+    return () => abortController.abort();
+  }, [appliedFilters, cursorStack]);
   // TODO: mock data for now; removed after GET services/envs are implemented
   const mockServiceList = ["Query API", "Ingestion API", "Worker", "RAG"];
   const mockEnvList = [
@@ -17,14 +49,20 @@ function App() {
     "production",
     "very very very very long string",
   ];
-  const handleSearch = (draft: Draft) => {
-    console.log(`handle search! new filters: ${JSON.stringify(draft)}`);
+  const handleSearch = (draft: LogFilters) => {
+    setLoading(true);
+    setCursorStack([]);
+    setAppliedFilters(draft);
   };
   const handlePrev = () => {
-    setPage((prev) => prev - 1);
+    setLoading(true);
+    setCursorStack((prev) => prev.slice(0, -1));
   };
   const handleNext = () => {
-    setPage((prev) => prev + 1);
+    const nextCursor = data?.next_cursor;
+    if (!nextCursor) return;
+    setLoading(true);
+    setCursorStack((prev) => [...prev, nextCursor]);
   };
 
   return (
@@ -35,11 +73,12 @@ function App() {
         envList={mockEnvList}
         onSearch={handleSearch}
       />
-      <LogTable rowsPerPage={PAGE_SIZE} pageNum={page} logs={mockLogs} />
+      {error && <span className="text-body">Error occurs...</span>}
+      <LogTable logs={data.items} isLoading={loading} />
       <Pager
-        pageNum={page}
-        canPrev={page > 1}
-        canNext={page !== Math.ceil(mockLogs.length / PAGE_SIZE)}
+        pageNum={cursorStack.length + 1}
+        canPrev={!loading && cursorStack.length > 0}
+        canNext={!loading && data.next_cursor != null}
         onPrev={handlePrev}
         onNext={handleNext}
       />
