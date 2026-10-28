@@ -1,4 +1,4 @@
-import { type LogItem } from "../api.ts";
+import { type LogItem } from "../types.ts";
 import Badge from "./Badge.tsx";
 
 type LogTableProps = {
@@ -27,7 +27,9 @@ const LogTable = (props: LogTableProps) => {
           )
           .map((log) => (
             <tr key={log.id} className="text-body">
-              <td>{log.occurred_at.slice(0, 19).replace("T", " ")}</td>
+              <td>
+                {new Date(log.occurred_at).toLocaleString().replace(",", " ")}
+              </td>
               <td title={log.service_name}>{log.service_name}</td>
               <td title={log.environment}>{log.environment}</td>
               <td>

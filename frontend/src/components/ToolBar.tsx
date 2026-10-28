@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LEVELS } from "../api.ts";
+import { LEVELS } from "../types.ts";
 
 type ToolBarProps = {
   serviceList: Array<string>;

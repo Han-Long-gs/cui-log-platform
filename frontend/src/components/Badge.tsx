@@ -1,13 +1,15 @@
-import { type Level } from "../api.ts"
+import { type Level } from "../types.ts";
 
 type BadgeProps = {
-    level: Level
-}
+  level: Level;
+};
 
 const Badge = (props: BadgeProps) => {
   return (
-    <span className={`badge badge--${props.level.toLowerCase()} text-label`}>{props.level}</span>
-  )
-}
+    <span className={`badge badge--${props.level.toLowerCase()} text-label`}>
+      {props.level}
+    </span>
+  );
+};
 
-export default Badge
+export default Badge;

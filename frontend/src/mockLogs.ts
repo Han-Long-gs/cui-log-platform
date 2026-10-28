@@ -1,4 +1,4 @@
-import type { LogItem } from "./api.ts";
+import type { LogItem } from "./types.ts";
 
 // Mock page of logs for UI checks. Newest first, like GET /api/v1/logs.
 // Covers: all levels, identical timestamps, multi-line and very long messages,
