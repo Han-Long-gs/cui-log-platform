@@ -36,4 +36,4 @@ RUN useradd --uid=10001 app
 USER app
 
 # run the application
-CMD ["uvicorn", "query_api.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "query_api.main:app", "--host", "0.0.0.0", "--port", "8001", "--forwarded-allow-ips", "*"]

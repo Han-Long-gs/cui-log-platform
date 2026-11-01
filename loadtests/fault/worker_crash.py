@@ -108,7 +108,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
     send_parser = commands.add_parser("send", help="send batches and record the accepted ones")
-    send_parser.add_argument("--url", default="http://127.0.0.1:8000")
+    send_parser.add_argument("--url", default="http://127.0.0.1:80")
     send_parser.add_argument("--out", type=Path, required=True, help="JSON-lines file accepted batches go to")
     send_parser.add_argument("--batch-size", type=int, default=200)
     send_parser.add_argument("--rate", type=float, default=5, help="batches per second")
