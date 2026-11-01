@@ -30,7 +30,9 @@ const LogTable = (props: LogTableProps) => {
           : props.logs.map((log) => (
               <tr key={log.id} className="text-body">
                 <td>
-                  {new Date(log.occurred_at).toLocaleString().replace(",", " ")}
+                  {new Date(log.occurred_at)
+                    .toLocaleString("en-US")
+                    .replace(",", " ")}
                 </td>
                 <td title={log.service_name}>{log.service_name}</td>
                 <td title={log.environment}>{log.environment}</td>
