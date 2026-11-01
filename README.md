@@ -6,8 +6,8 @@ a multi-tenant log ingestion platform
 
 ### Prerequisites
 
-- macOS: Docker Desktop + uv
-- Windows: WSL2 Ubuntu -> enable WSL Integration -> install uv in Ubuntu
+- Docker Desktop + uv
+- Windows only: WSL2 Ubuntu -> enable WSL Integration for Ubuntu in Docker Desktop -> install uv in Ubuntu
   - run every command below in the Ubuntu shell
 - idle localhost:80
 
