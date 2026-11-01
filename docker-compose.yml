@@ -2,6 +2,18 @@
 #     https://docs.docker.com/reference/compose-file/services/#healthcheck
 #     https://stackoverflow.com/questions/41330514/docker-rabbitmq-persistency # for rabbitmq data persistency...
 services:
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/nginx/Dockerfile
+    depends_on:
+      ingestion-api:
+        condition: service_started
+      query-api:
+        condition: service_started
+    ports:
+      - "127.0.0.1:80:80"
+
   ingestion-api:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:?set it in .env, see .env.example}:${POSTGRES_PASSWORD:?set it in .env, see .env.example}@postgres:5432/${POSTGRES_DB:?set it in .env, see .env.example}
@@ -9,16 +21,35 @@ services:
     build:
       context: .
       dockerfile: apps/ingestion-api/Dockerfile
-    ports:
-      - "127.0.0.1:8000:8000"
     depends_on:
-      # uncomment for sync mode only
-      # postgres:
-      #   condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      # temporary; queue mode doesnt need pg at startup (sync mode does)
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/readyz\")"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
+
+  query-api:
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:?set it in .env, see .env.example}:${POSTGRES_PASSWORD:?set it in .env, see .env.example}@postgres:5432/${POSTGRES_DB:?set it in .env, see .env.example}
+      # required by Settings(); query-api never connects to the broker
+      - BROKER_URL=amqp://${RABBITMQ_DEFAULT_USER:?set it in .env, see .env.example}:${RABBITMQ_DEFAULT_PASS:?set it in .env, see .env.example}@rabbitmq:5672//
+    build:
+      context: .
+      dockerfile: apps/query-api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8001/readyz\")"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -35,6 +66,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
 
@@ -65,7 +98,7 @@ services:
     ports:
       - "127.0.0.1:15672:15672"
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      test: ["CMD", "gosu", "rabbitmq", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -74,12 +107,10 @@ services:
     volumes:
       - mq-data:/var/lib/rabbitmq
 
-  # for db migration only, see how profiles work here: https://docs.docker.com/reference/compose-file/profiles/
   migrate:
-    profiles:
-      - migration
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:?set it in .env, see .env.example}:${POSTGRES_PASSWORD:?set it in .env, see .env.example}@postgres:5432/${POSTGRES_DB:?set it in .env, see .env.example}
+      # required by Settings(); migrate never connects to the broker
       - BROKER_URL=amqp://${RABBITMQ_DEFAULT_USER:?set it in .env, see .env.example}:${RABBITMQ_DEFAULT_PASS:?set it in .env, see .env.example}@rabbitmq:5672//
     build:
       context: .

@@ -6,6 +6,10 @@
 .git
 .github
 
+# frontend
+frontend/node_modules
+frontend/dist
+
 # caches and reports
 **/__pycache__
 **/*.pyc
