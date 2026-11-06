@@ -83,9 +83,12 @@ def fetch_log_events(
     if cursor:
         last_row_timestamp, last_row_id = cursor
         where_clause.append(
-            or_(
-                and_(LogEvent.occurred_at == last_row_timestamp, LogEvent.id < last_row_id),
-                LogEvent.occurred_at < last_row_timestamp,
+            and_(
+                LogEvent.occurred_at <= last_row_timestamp,
+                or_(
+                    and_(LogEvent.occurred_at == last_row_timestamp, LogEvent.id < last_row_id),
+                    LogEvent.occurred_at < last_row_timestamp,
+                ),
             )
         )
 
