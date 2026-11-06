@@ -1,0 +1,21 @@
+-- latest 100 ERROR (keyset, page 1)
+-- parameters: {'tenant_id_1': UUID('00000000-0000-4000-8000-000000000408'), 'level_1': 'ERROR', 'param_1': 101}
+
+SELECT log_events.id, log_events.event_id, log_events.tenant_id, log_events.service_name, log_events.environment, log_events.level, log_events.message, log_events.occurred_at, log_events.ingested_at, log_events.trace_id, log_events.custom 
+FROM log_events 
+WHERE log_events.tenant_id = %(tenant_id_1)s::UUID AND log_events.level = %(level_1)s::VARCHAR ORDER BY log_events.occurred_at DESC, log_events.id DESC 
+ LIMIT %(param_1)s::INTEGER
+
+Limit  (cost=1.17..77.15 rows=101 width=160) (actual time=0.028..0.066 rows=101.00 loops=1)
+  Buffers: shared hit=105
+  ->  Incremental Sort  (cost=1.17..38162.40 rows=50733 width=160) (actual time=0.028..0.059 rows=101.00 loops=1)
+        Sort Key: occurred_at DESC, id DESC
+        Presorted Key: occurred_at
+        Full-sort Groups: 4  Sort Method: quicksort  Average Memory: 33kB  Peak Memory: 33kB
+        Buffers: shared hit=105
+        ->  Index Scan using ix_tid_lv_occurred on log_events  (cost=0.42..35953.34 rows=50733 width=160) (actual time=0.008..0.035 rows=102.00 loops=1)
+              Index Cond: ((tenant_id = '00000000-0000-4000-8000-000000000408'::uuid) AND ((level)::text = 'ERROR'::text))
+              Index Searches: 1
+              Buffers: shared hit=105
+Planning Time: 0.039 ms
+Execution Time: 0.075 ms

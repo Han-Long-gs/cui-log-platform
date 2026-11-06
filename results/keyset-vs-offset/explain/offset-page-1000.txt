@@ -1,0 +1,21 @@
+-- OFFSET page 1000
+-- parameters: {'tenant_id_1': UUID('00000000-0000-4000-8000-000000000408'), 'param_1': 101, 'param_2': 99900}
+
+SELECT log_events.id, log_events.event_id, log_events.tenant_id, log_events.service_name, log_events.environment, log_events.level, log_events.message, log_events.occurred_at, log_events.ingested_at, log_events.trace_id, log_events.custom 
+FROM log_events 
+WHERE log_events.tenant_id = %(tenant_id_1)s::UUID ORDER BY log_events.occurred_at DESC, log_events.id DESC 
+ LIMIT %(param_1)s::INTEGER OFFSET %(param_2)s::INTEGER
+
+Limit  (cost=10538.94..10549.60 rows=101 width=160) (actual time=126.698..126.797 rows=101.00 loops=1)
+  Buffers: shared hit=85857 read=14558
+  ->  Incremental Sort  (cost=0.65..105489.03 rows=1000000 width=160) (actual time=0.105..123.975 rows=100001.00 loops=1)
+        Sort Key: occurred_at DESC, id DESC
+        Presorted Key: occurred_at
+        Full-sort Groups: 3047  Sort Method: quicksort  Average Memory: 34kB  Peak Memory: 34kB
+        Buffers: shared hit=85857 read=14558
+        ->  Index Scan using ix_tid_occurred on log_events  (cost=0.42..78413.11 rows=1000000 width=160) (actual time=0.050..106.366 rows=100002.00 loops=1)
+              Index Cond: (tenant_id = '00000000-0000-4000-8000-000000000408'::uuid)
+              Index Searches: 1
+              Buffers: shared hit=85857 read=14558
+Planning Time: 0.065 ms
+Execution Time: 126.813 ms
