@@ -18,7 +18,7 @@ __pycache__/
 
 # other
 .vscode/
-loadtests/results/3.10/
+results/*/raw/
 .DS_Store
 
 

@@ -1,8 +1,8 @@
 """Worker-crash fault test: send a steady stream of batches to the ingestion API, then check every accepted event
 against the database.
 
-    uv run --env-file .env.dev python loadtests/fault/worker_crash.py send --out run1.jsonl --duration 60
-    uv run --env-file .env.dev python loadtests/fault/worker_crash.py verify --file run1.jsonl
+    uv run --env-file .env.dev python scripts/fault_worker_crash.py send --out run1.jsonl --duration 60
+    uv run --env-file .env.dev python scripts/fault_worker_crash.py verify --file run1.jsonl
 
 `send` writes one JSON line per batch the API accepted (202): its batch_id and event_ids. `verify` reads that file
 and reports, for those ids only, events missing from log_events, events stored more than once, and the batches'
